@@ -27,7 +27,7 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 | T7 | S6 | Map UI (`web/`) against the event contract below | delegated (parallel unit, disjoint surface `web/`) | done (worker; verified mock + real backend) | 3f1efac |
 | T8 | — | README, submission text, rehearsal, backup recording | delegated (Haiku) + inline | README+pitch done, rehearsal/recording todo | 50f9324 |
 | T9 | S8 | Spread model `spread.py` + `GET /api/spread?lat=&lon=&day=&fuel=` | inline | done (Ofunato d1: 16/140/421 ha at +1/3/6 h, ~2.8 s) | 75c5311 |
-| T10 | S8 | 3D view in UI (MapLibre) | delegated (parallel unit, `web/`) | todo | |
+| T10 | S8 | 3D view in UI (MapLibre) + React rebuild | delegated (Haiku, small units) | done (fallback web/ + frontend/) | 5752c8d, bbeb2c8 |
 
 ## Event contract (SSE, `GET /api/run?mode=live|replay`)
 

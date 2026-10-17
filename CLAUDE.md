@@ -18,7 +18,12 @@ cd app && uv run pytest tests/test_scoring.py::test_urgency_rises_as_detections_
 curl -sN "http://localhost:8000/api/run?mode=replay"   # raw SSE stream (mode=live|replay)
 ```
 
-UI without backend: serve `web/` over http and open `index.html?mock=1` (replays `web/mock-events.json`).
+```bash
+cd frontend && npm run build    # React UI → frontend/dist, served by FastAPI at :8000 (no server restart needed after rebuilds)
+cd frontend && npm run dev      # Vite dev server :5173, proxies /api → :8000
+```
+
+The server serves `frontend/dist` when it exists, otherwise the vanilla fallback UI in `web/`. Both support `?mock=1` (no backend). Keep MapLibre pinned at 5.6.2: v6 ships its worker as an ES module chain that breaks in the Vite production build. Frontend styling follows `frontend/DESIGN.md` through `frontend/STYLE-RULES.md` (Tailwind v4 only; lime is the only UI accent, fire colors only as map data).
 
 Restart uvicorn after backend edits (no reload). The server warms up the embedding model at startup; the first run hangs without it.
 
