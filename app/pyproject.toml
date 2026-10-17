@@ -6,9 +6,11 @@ dependencies = [
     "fastapi>=0.143.3",
     "httpx>=0.28.1",
     "neo4j-agent-memory[sentence-transformers]>=0.7.0",
+    "numpy>=2.5.4",
     "openai>=3.33.0",
     "pillow>=13.0.0",
     "python-dotenv>=1.2.4",
+    "scikit-image>=0.26.0",
     "typesafe-sdk>=0.7.5",
     "uvicorn[standard]>=0.54.0",
 ]

@@ -11,6 +11,7 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 - **S4** Memory: Neo4j Agent Memory stores sites, verdicts as reasoning traces, detection history; known industrial sites skip Jev.
 - **S5** Demo modes: live (today's FIRMS) and replay (Ofunato, 2025-02-26 → 2025-03-01, FIRMS archive).
 - **S6** Map UI: single page, hotspots appear live colored by verdict; click → photos, probe answers, scores, memory trace, report.
+- **S8** 3D spread view: "si somos capaces de generar una simulacion didactica y prediccion basandonos en el clima, terreno, etc, seria espectacular ... pasarle un punto en un mapa y generartelo en 3d". Presented as a spread prediction (user: "tenemos que vender humo"). MapLibre 5.6.2 terrain (AWS terrarium DEM + GSI photo), perimeters +1h/+3h/+6h from wind/slope/fuel.
 - **S7** Recommended actions are rule-based in code (assumption: evacuation advice only if houses are within reach and danger ≥ 4).
 
 ## Tasks
@@ -24,7 +25,9 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 | T5 | S3 | ai& analyst report (strict JSON) | inline | done | 3f1efac |
 | T6 | S1,S5 | Pipeline + FastAPI SSE (`/api/run?mode=live|replay`) | inline | done | 3f1efac |
 | T7 | S6 | Map UI (`web/`) against the event contract below | delegated (parallel unit, disjoint surface `web/`) | done (worker; verified mock + real backend) | 3f1efac |
-| T8 | — | README, submission text, rehearsal, backup recording | inline | todo | |
+| T8 | — | README, submission text, rehearsal, backup recording | delegated (Haiku) + inline | README+pitch done, rehearsal/recording todo | 50f9324 |
+| T9 | S8 | Spread model `spread.py` + `GET /api/spread/{id}` | inline | todo | |
+| T10 | S8 | 3D view in UI (MapLibre) | delegated (parallel unit, `web/`) | todo | |
 
 ## Event contract (SSE, `GET /api/run?mode=live|replay`)
 
@@ -43,3 +46,4 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 - **L3** Evidence from spikes (`spike/`, `docs/09`, `docs/10`, `docs/11`): all integrations verified; Jev 71 sites in 5.6 s; ask "industrial within ~400 m" due to VIIRS ~375 m geolocation; Ofunato archive = 103 detections.
 - **L4** (user, verbatim): "cabe aclarar que no haremos muchos tests, los minimos posibles, neceistamos velocidad de ejecucion sin enredarnos esto no debe ser escalable, buscamos velocidad de accion"
 - **L5** Verified end to end: Ofunato replay 48 hotspots, 37 Jev calls, 3-4 ai& reports in ~23 s; UI renders alerts, report JA/EN. Fixes: Neo4j deadlock (serialized memory writes), embedding warmup at startup, reports in background, text model for reports (5-11 s vs 20-47 s vision), replay forgets Ofunato area first.
+- **L6** (user, verbatim): "si somos capaces de generar una simulacion didactica y prediccion basandonos en el clima, terreno, etc, seria espectacular, podemos emplear alguna libreria threejs o no se cual ... debemos investigarlo antes de hacer cualquier cosa"; later: "tenemos que vender humo nadie nos a juzgar ni retarnos". Research in docs/research/14a-c; MapLibre terrain prototype verified (web/terrain-test.html).

@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 
-from . import memory
+from . import memory, sources, spread
 from .config import IMAGES_DIR, ROOT
 from .pipeline import Run
 
@@ -59,6 +59,12 @@ async def run(mode: str = "live") -> AsyncIterable[ServerSentEvent]:
         task.cancel()
 
 
+@app.get("/api/spread")
+async def spread_prediction(lat: float, lon: float, day: str | None = None, fuel: str = "conifer_forest") -> dict:
+    wx = await asyncio.to_thread(sources.weather, lat, lon, day)
+    return await asyncio.to_thread(spread.simulate, lat, lon, wx, fuel)
+
+
 @app.get("/api/images/{name}")
 async def image(name: str) -> FileResponse:
     path = (IMAGES_DIR / name).resolve()
@@ -67,6 +73,7 @@ async def image(name: str) -> FileResponse:
     return FileResponse(path)
 
 
-WEB = Path(ROOT) / "web"
-WEB.mkdir(exist_ok=True)
+# Serve the React build when present (frontend/dist), else the vanilla fallback UI (web/).
+DIST = Path(ROOT) / "frontend" / "dist"
+WEB = DIST if (DIST / "index.html").exists() else Path(ROOT) / "web"
 app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
