@@ -1,135 +1,133 @@
-# 15 — The story (read this, then tell it your way)
+# 15 — How to sell it
 
-Not a script. Read it once or twice, keep the five numbers in your head, and talk.
-
----
-
-## The one-liner
-
-**Wildfire Sentinel turns satellite heat spots into a decision: is it a real fire, where will it go, and what should we do about it.**
-
-If you only say one thing, say that.
+Read it, keep the feeling, say it your way.
 
 ---
 
-## The problem (say it like a story)
+## What it is (the product, not the tech)
 
-Every day, NASA satellites see dozens of heat spots across Japan. Almost all of them are **not fires**: they are steel mills, refineries, factories. They're hot every single day.
+# **Wildfire Sentinel — the AI wildfire alert for fire departments.**
 
-So when a real wildfire starts, it's buried in that noise. And a fire officer can't check every dot by hand.
+**It tells a fire chief three things the moment a wildfire shows up: it's real, here's where it's going, and here's the plan to stop it.**
 
-And the first hours decide everything. In February 2025, the Ofunato fire in Iwate became **Japan's largest wildfire in over 50 years**: about 3,000 hectares, one death, hundreds of buildings, thousands evacuated.
-
----
-
-## What we built (three moments)
-
-### 1. "Is it real?" — the alert
-For every heat spot, the system looks at the **aerial photo of that exact place** and asks simple questions: is there a factory nearby? forest? houses? water?
-- Factory → ignored.
-- Forest, no factory → **fire alert, in under a second.**
-- It **remembers** every place it has judged (Neo4j). A known factory never costs another check.
-
-**Today's real data:** about 150 heat spots in Japan; most were factories and got filtered out, ~20 became alerts worth a look.
-
-### 2. "Where will it go?" — the prediction
-For an alert, we simulate the fire on the **real 3D terrain**, with the **real hourly weather** for the next 7 days: wind, humidity, rain. Fire runs faster uphill and with the wind; rain stops it; the sea doesn't burn.
-
-You drag a slider and **watch the fire grow** hour by hour, with the weather right below it.
-
-### 3. "What do we do?" — the response plan
-This is the part firefighters care about. You don't fight a wildfire with a hose: you **cut a firebreak** where the fire will be in a few hours, with enough crews to finish it in time.
-
-You pick a moment ("let's decide now" or "six hours from now"), and the system:
-- draws the **control line** where the front will be 3 hours later,
-- tells you **how many crews** you need,
-- re-runs the fire **with** that line, so you see the difference,
-- and an AI (ai&) writes the **tactical plan** in Japanese and English: where to anchor, where to attack, when to bring helicopters, how to keep crews safe.
-
-**The message:** decide early → short line, few crews, small fire. Decide late → longer line, more crews, bigger fire. You can compare both on the timeline.
+Taglines (pick one, use it at the start and at the end):
+- **"From satellite to fire plan, in seconds."**
+- **"Know first. See ahead. Stop it early."**
+- **"Your wildfire co-pilot."**
 
 ---
 
-## The proof (Ofunato, real data)
+## Open with a scene (first 15 seconds, this is what grabs them)
 
-We replay the Ofunato fire, day by day, from NASA's archive.
+> "February 26th, 2025, one in the afternoon. A fire starts on a hillside in Ofunato.
+> By the time anyone really understood how big it was, it had already burned hundreds of hectares.
+> It became Japan's largest wildfire in fifty years: three thousand hectares, hundreds of homes, one life.
+> Now imagine the fire chief that day had this on the screen."
 
-- We start the prediction from the **first time the satellite saw it**.
-- **30 hours later, we predicted ~1,140 hectares. The official number was 1,200.** That's a 5% difference.
-- After that, the real fire stayed smaller than our curve. That makes sense: **our model shows the fire with nobody fighting it**, and in reality hundreds of firefighters and helicopters were working. The gap is, in large part, what they saved.
-
-And in the graph view: every satellite detection is linked to the one it most likely spread from. You can literally see the **family tree of the fire**:
-- one point from the first hour is the "parent" of **82 later detections**: that was the main branch;
-- **two new fronts** jumped more than 2 km ahead: embers starting new fires.
+Then show the app.
 
 ---
 
-## Why it matters (the "so what")
+## Who it's for
 
-- **Less noise:** officers stop looking at factories.
-- **Earlier decisions:** see where it's going before it gets there.
-- **Better plans:** test a strategy before sending crews.
-- **Japanese-ready:** every brief is in Japanese and English.
-- **Remote areas:** places where nobody calls 119 in time.
+**Fire departments and municipal disaster offices in Japan** (消防本部 / 防災課).
+The people who, at 2 a.m., have to decide: do we send crews? where? how many? do we evacuate?
+
+Today they decide with phone calls, a paper map and experience. We give them **a co-pilot**.
 
 ---
 
-## The five numbers to remember
+## The three promises (this is the product)
 
-| Number | What it means |
+### 🔥 1. Know first — "Is it a real fire?"
+Satellites see dozens of heat spots in Japan every day. **Most are steel mills and factories.**
+Wildfire Sentinel checks every single one against the aerial photo and **only alerts when it's a real fire risk**.
+**Alert in under a second. No noise.**
+
+### 🗺️ 2. See ahead — "Where is it going?"
+One tap and the chief sees the fire **grow on real 3D terrain**, hour by hour, with **tomorrow's actual wind and rain**.
+Where it'll be in 3 hours. In 24. Which neighbourhood is in the way. When the rain will save us.
+
+### 🚒 3. Stop it early — "What do we do?"
+Tap **"Plan"** and the system tells you **where to cut the firebreak, how many crews you need, and how much fire you'll save**.
+Plus a ready-to-send **tactical brief in Japanese and English**.
+Try "act now" vs "act in 6 hours" and **see the difference before you send anyone**.
+
+---
+
+## The killer line
+
+> **"Act early and the fire stays small. Act late and it doesn't. Wildfire Sentinel shows you that before it happens."**
+
+---
+
+## Proof it works (real fire, real numbers)
+
+We replayed the Ofunato fire with real NASA data.
+- **30 hours in, we predicted 1,140 hectares. The official figure: 1,200.** 95% on target.
+- After that, the real fire stayed smaller than our prediction, because **our prediction is "nobody fights it"**, and hundreds of firefighters did. That gap is what they saved. And it's exactly what our plan tool helps you win faster.
+
+And Neo4j lets us show **the family tree of the fire**: one single point in the first hour gave birth to **82 more**. Catch that one early, and you cut the main branch.
+
+---
+
+## Why now
+
+- Wildfires in Japan are **getting bigger**: Ofunato 2025 was the worst in 50 years.
+- Satellite data is **free**. AI is **fast and cheap**. Nobody has put it **in the fire chief's hands**.
+- **Made for Japan:** Japanese briefs, Japanese aerial photos, AI running **in Japan** (ai&).
+
+---
+
+## Under the hood (only if they ask, one breath each)
+
+- **NASA satellites** see the heat.
+- **Jev** looks at the aerial photo: factory or forest? 0.2 seconds.
+- **Our model** simulates the fire on real terrain with real weather.
+- **ai&** (Japanese AI) writes the plan and the brief.
+- **Neo4j** is the memory: every place, every decision, and how each fire spread.
+
+---
+
+## The numbers to drop
+
+| | |
 | --- | --- |
-| **< 1 second** | from heat spot to fire alert |
-| **~150 → ~20** | today's heat spots in Japan vs. the ones worth a look |
-| **1,140 vs 1,200 ha** | our Ofunato prediction at 30 h vs. the official figure |
-| **82** | detections that grew from one single point (the main branch) |
-| **3 hours** | the lead time we give crews to cut the control line |
+| **< 1 sec** | heat spot → fire alert |
+| **~150 → ~20** | today's heat spots in Japan → the ones worth a look |
+| **95%** | Ofunato burned area, predicted vs official at 30 h |
+| **82** | detections that grew from one single early point |
+| **3 h** | lead time we give crews to cut the firebreak |
 
 ---
 
-## The sponsors, in one breath each
+## Demo (2 minutes, let it breathe)
 
-- **ai&** (Japanese AI, runs in Japan): writes the situation report and the tactical plan, in Japanese and English. The AI writes words; the numbers always come from our code.
-- **Neo4j** (graph database): it's the system's **memory** (every place, every decision, and why) and it stores each fire as a **graph of how it spread**.
-- **Jev** (very fast image AI, not a sponsor): the "is it a factory or a forest?" check, in about 0.2 seconds.
-
----
-
-## Demo path (what to click)
-
-1. **Live** → "these are today's real heat spots; most are factories, filtered out."
-2. **Drill · Ashikaga** → alert pops up → open it → **3D prediction** → press play.
-3. Slider at the start → **Plan response** → toggle *No action / With plan* → move the slider later → **Re-plan** → click P1 / P2 to compare.
-4. **Replay · Ofunato** → days roll by → open the fire → 3D → point at **Reality check** (1,140 vs 1,200).
-5. **Fire graph** → click *Key spreading point*, then *New fronts*.
-
-If time is short: skip Live, start at Drill.
+1. **Drill · Ashikaga** → *"An alert just came in."* → open it.
+2. **3D prediction** → press play → *"This is where it goes if nobody acts."*
+3. **Plan now** → toggle *With plan* → *"Here's the firebreak, two crews, fire stays small."*
+4. Move to +6 h → **Re-plan** → *"Same fire, six hours late: longer line, more crews, bigger fire."*
+5. **Replay · Ofunato** → open it → *"And it works on a real fire: 1,140 predicted, 1,200 real."*
+6. **Fire graph** → *Key spreading point* → *"One early point, 82 more fires. That's the one to stop."*
 
 ---
 
-## Questions you'll probably get (short answers)
+## Tough questions → confident answers
 
-**"Is this early warning? How often does the satellite look?"**
-Honestly, not minute-level. These satellites pass over Japan about six times a day. 119 calls are faster for the first minutes. We triage every pass, track the fire and predict it. The next step is Japan's **Himawari** satellite, which images Japan every 10 minutes, as the early trigger in front of this same system.
+**"Is it really early warning?"**
+"It alerts every time the satellite passes, about six times a day, and filters the noise. The next step is Japan's Himawari satellite, every 10 minutes, as the trigger in front of the same system."
 
-**"How accurate is the prediction?"**
-At 30 hours into Ofunato, within 5% of the official burned area. After that it shows the fire without firefighting, so it's bigger than reality. That's on purpose: it's the "what if nobody acts" scenario.
+**"How do you know the prediction is good?"**
+"Ofunato: 95% on target at 30 hours. After that it's bigger than reality on purpose: it's the 'nobody fights it' scenario, which is exactly what you plan against."
 
-**"Isn't this just a nice map?"**
-No: it answers three decisions. Is it real, where will it go, and where to put the firebreak and how many crews.
+**"Who pays?"**
+"Prefectures and municipalities, per region. The data is free and the AI is cheap, so it's affordable even for small towns."
 
-**"Why a graph database?"**
-Because the questions are about connections: what do we already know near this point, and which fire point grew from which. Neo4j answers both.
-
-**"What's not done yet?"**
-The model doesn't know roads, rivers or which areas are towns. The spread model is simple and tuned on one fire. Next: land-use maps, Himawari, and testing on more fires.
-
-**"Who would use it?"**
-Municipal disaster offices and fire departments: the people who have to decide where to send crews and when to evacuate.
+**"What's next?"**
+"Himawari for faster alerts, maps of roads and towns in the model, and a pilot with one fire department."
 
 ---
 
-## Closing line (pick one)
+## Close
 
-- *"Satellites see heat. We turn it into a decision."*
-- *"From a dot on a map to a plan for the crews."*
-- *"Find it in a second, see where it goes, decide before it gets there."*
+> **"Satellites see heat. Wildfire Sentinel turns it into a plan. From satellite to fire plan, in seconds."**

@@ -30,7 +30,7 @@ Saturday 17 October 2026 · Good Space Kanda Tekko 5F · hosted by +81 Builders.
 12. [Product design](12-product-design.md) — roles, flow, situation report schema, demo modes
 13. [Pitch and submission](13-pitch-and-submission.md) — 3-minute script, judge Q&A, form text
 14. [Cómo funciona (ES)](14-como-funciona.md) — guía en español: servicios, Jev, Neo4j, grafo, predicción, plan
-15. [The story](15-the-story.md) — non-technical narrative to tell the idea freestyle: problem, three moments, proof, numbers, short answers
+15. [How to sell it](15-the-story.md) — product pitch for fire departments: scene, three promises, proof, demo, tough questions
 
 ## Sources
 
