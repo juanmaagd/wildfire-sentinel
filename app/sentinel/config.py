@@ -19,6 +19,10 @@ REPLAY_DAYS = 9  # 2025-02-26 → 03-06: ignition, growth, decline, extinguished
 # Combining the three VIIRS satellites shows the whole fire lifecycle (NOAA-20 alone misses 03-02..03-04).
 REPLAY_SOURCES = ("VIIRS_NOAA20_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA21_NRT")
 
+# Drill: an everyday wildland-urban fire — a small brush fire on the forested slope right above
+# central Ashikaga (site of the 2021 Mt. Ryogai fire), run with today's live weather forecast.
+DRILL = {"lat": 36.3427, "lon": 139.4462, "frp": 8.5, "detections": 2, "place": "Ashikaga · Mt. Ryogai foothills"}
+
 LOCAL_NEO4J = {"uri": "bolt://localhost:7687", "username": "neo4j", "password": "wildfire-local-dev"}  # docker-compose.yml
 
 

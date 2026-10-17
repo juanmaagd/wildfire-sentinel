@@ -85,8 +85,11 @@ export default function App() {
   }
 
   // 3D prediction for an incident starts from its first day, so the later real detections can be compared.
+  // Live and drill have no satellite history: the prediction runs from now on the weather forecast.
+  const replay = state.mode === 'replay'
   const spreadFrom = useMemo(() => {
     if (!selected?.hotspot) return undefined
+    if (!replay) return { lat: selected.hotspot.lat, lon: selected.hotspot.lon, day: undefined }
     const inc = incidents.find((i) => i.sites.some((s) => s.id === selected.id))
     if (!inc) return { lat: selected.hotspot.lat, lon: selected.hotspot.lon, day: selected.hotspot.acq_date }
     const firstDay = inc.days[0]
@@ -94,7 +97,7 @@ export default function App() {
       .filter((s) => s.hotspot?.acq_date === firstDay)
       .sort((x, y) => (y.hotspot!.frp ?? 0) - (x.hotspot!.frp ?? 0))[0]
     return { lat: first.hotspot!.lat, lon: first.hotspot!.lon, day: firstDay }
-  }, [selected, incidents])
+  }, [selected, incidents, replay])
 
   const fuel = selected?.probe?.answers?.fuel_type as { value?: unknown } | undefined
   const fuelValue = typeof fuel?.value === 'string' ? fuel.value : undefined

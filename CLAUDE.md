@@ -15,7 +15,7 @@ docker compose up -d                                   # local Neo4j 5.26 (neo4j
 cd app && uv run uvicorn sentinel.server:app --port 8000   # backend + UI at http://localhost:8000
 cd app && uv run pytest                                # scoring rules tests
 cd app && uv run pytest tests/test_scoring.py::test_urgency_rises_as_detections_accumulate   # single test
-curl -sN "http://localhost:8000/api/run?mode=replay"   # raw SSE stream (mode=live|replay)
+curl -sN "http://localhost:8000/api/run?mode=replay"   # raw SSE stream (mode=live|replay|drill)
 ```
 
 ```bash
@@ -33,7 +33,7 @@ Keys live in the repo-root `.env` (loaded by `app/sentinel/config.py`): `TYPESAF
 
 ## Architecture (`app/sentinel/`)
 
-- `pipeline.py` — the orchestrator. `Run` emits SSE events (`day`, `hotspot`, `triage`, `probe`, `report`, `summary`, `analysis_error`, `done`) as each step finishes. Stage 1 runs concurrently (semaphore 8); stage 2 + ai& reports run as background tasks so they never block the next batch of alerts. Replay iterates 4 days of the Ofunato fire (2025-02-26) and first forgets that area in memory so Jev is visible in the demo.
+- `pipeline.py` — the orchestrator. `Run` emits SSE events (`day`, `hotspot`, `triage`, `probe`, `report`, `summary`, `analysis_error`, `done`) as each step finishes. Stage 1 runs concurrently (semaphore 8); stage 2 + ai& reports run as background tasks so they never block the next batch of alerts. Replay iterates 9 days of the Ofunato fire (2025-02-26) and first forgets that area in memory so Jev is visible in the demo. Drill (`config.DRILL`) injects one everyday brush-fire alert on the slope above central Ashikaga and runs it on live weather; its spread view has no satellite history.
 - `jev.py` + `questions.py` — Jev calls. Images need the `TypeSafe-Danger-Zone-Images: true` header, model `jev-preview`, **280–1568 px per side**. Stage 1 asks about ~400 m around the center (VIIRS geolocation is ~375 m, never ask about the exact center pixel). Stage 2 sends `close` (z16), `wide` (z14) and `satellite` images in one request.
 - `scoring.py` — pure rules: `classify` (stage-1 verdict), `score` (1–5 danger/spread/exposure/urgency from probe + weather + FIRMS), `recommended_actions`. Numbers and actions come from here, never from the LLM.
 - `analyst.py` — ai& (OpenAI SDK, `https://api.aiand.com/v1`). Default `deepseek-ai/deepseek-v4-flash` with strict JSON schema (~5–11 s); the vision model is opt-in because it takes 20–47 s. Feed it Jev **labels**, not raw scale numbers, or it invents units.

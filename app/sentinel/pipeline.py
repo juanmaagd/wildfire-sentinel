@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Awaitable, Callable
 
 from . import analyst, jev, memory, scoring, sources
-from .config import JAPAN_BBOX, OFUNATO_BBOX, REPLAY_DAYS, REPLAY_SOURCES, REPLAY_START
+from .config import DRILL, JAPAN_BBOX, OFUNATO_BBOX, REPLAY_DAYS, REPLAY_SOURCES, REPLAY_START
 
 Emit = Callable[[str, dict], Awaitable[None]]
 
@@ -71,7 +71,7 @@ async def report_on_demand(hotspot_id: str) -> dict:
     """ai& situation report for one alert, only when a user asks for it."""
     if hotspot_id not in ASSESSED:
         h = HOTSPOTS[hotspot_id]
-        day = h.acq_date if h.acq_date != sources.today() else None
+        day = None if hotspot_id.startswith("drill_") or h.acq_date == sources.today() else h.acq_date
         async with memory.client() as mem, jev.client() as jv:
             await assess(h, mem, jv, day, h.detections)
     cached = ASSESSED[hotspot_id]
@@ -179,6 +179,14 @@ class Run:
                                             "detections": len(rows), "rain_mm": round(rain.get(day, 0.0), 1)})
                     await self.batch(sources.cluster_hotspots(rows), mem, jv, day)
                     await asyncio.sleep(1.2)  # pacing so the audience can follow day by day
+            elif self.mode == "drill":
+                lat, lon = DRILL["lat"], DRILL["lon"]
+                await asyncio.to_thread(memory.forget_area, (lon - 0.02, lat - 0.02, lon + 0.02, lat + 0.02))
+                now = datetime.now(timezone.utc)
+                h = sources.Hotspot(id=f"drill_{now:%H%M%S}_{lat:.4f}_{lon:.4f}", lat=lat, lon=lon, frp=DRILL["frp"],
+                                    acq_date=now.date().isoformat(), acq_time=now.strftime("%H%M"),
+                                    detections=DRILL["detections"])
+                await self.batch([h], mem, jv, None)
             else:
                 rows = await asyncio.to_thread(sources.fetch_hotspots, JAPAN_BBOX, 2)
                 await self.batch(sources.cluster_hotspots(rows), mem, jv, None)

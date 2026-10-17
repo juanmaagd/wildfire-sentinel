@@ -156,7 +156,7 @@ export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'start': {
       const replay = action.mode === 'replay'
-      const label = replay ? 'Replay · Ofunato 2025' : 'Live · today'
+      const label = replay ? 'Replay · Ofunato 2025' : action.mode === 'drill' ? 'Drill · Ashikaga brush fire, today' : 'Live · today'
       const base: State = {
         ...initialState(),
         lang: state.lang,
@@ -166,7 +166,9 @@ export function reducer(state: State, action: Action): State {
         statusText: `${label} — streaming…`,
         focus: replay
           ? { lat: 39.05, lon: 141.78, zoom: 11, nonce: action.runId }
-          : null,
+          : action.mode === 'drill'
+            ? { lat: 36.3427, lon: 139.4462, zoom: 13, nonce: action.runId }
+            : null,
       }
       return pushFeed(base, `Run started: ${label}`, 'sys', action.at)
     }

@@ -33,8 +33,8 @@ app = FastAPI(title="Wildfire Sentinel", lifespan=lifespan)
 
 @app.get("/api/run", response_class=EventSourceResponse)
 async def run(mode: str = "live") -> AsyncIterable[ServerSentEvent]:
-    if mode not in ("live", "replay"):
-        raise HTTPException(400, "mode must be live or replay")
+    if mode not in ("live", "replay", "drill"):
+        raise HTTPException(400, "mode must be live, replay or drill")
     queue: asyncio.Queue = asyncio.Queue()
 
     async def emit(event: str, data: dict) -> None:

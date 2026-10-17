@@ -1,5 +1,5 @@
 export type Verdict = 'possible_fire' | 'industrial' | 'water' | 'other'
-export type Mode = 'live' | 'replay'
+export type Mode = 'live' | 'replay' | 'drill'
 export type Lang = 'en' | 'ja'
 
 export interface Hotspot {
