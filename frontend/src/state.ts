@@ -137,8 +137,13 @@ function onEvent(state: State, name: string, raw: unknown, at: number): State {
       )
     }
     case 'day': {
-      const day = { index: Number(d.index), of: Number(d.of), date: String(d.date) }
-      return pushFeed({ ...state, day }, `── Day ${day.index}/${day.of}: ${day.date} ──`, 'sys', at)
+      const day = {
+        index: Number(d.index), of: Number(d.of), date: String(d.date),
+        detections: d.detections != null ? Number(d.detections) : undefined,
+        rain_mm: d.rain_mm != null ? Number(d.rain_mm) : undefined,
+      }
+      const extra = `${day.detections != null ? ` · ${day.detections} satellite detections` : ''}${day.rain_mm ? ` · rain ${day.rain_mm} mm` : ''}`
+      return pushFeed({ ...state, day }, `── Day ${day.index}/${day.of}: ${day.date}${extra} ──`, 'sys', at)
     }
     case 'analysis_error':
       return pushFeed(state, `Analysis failed: ${String(d.message ?? '')}`, 'err', at)

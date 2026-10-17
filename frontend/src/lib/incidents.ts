@@ -14,6 +14,8 @@ export interface Incident {
   maxFrp: number
   center: [number, number] // lon, lat
   outline: Feature<Polygon>
+  lastDay: string
+  active: boolean // detected on the current replay day (or the day before); false = extinguished
 }
 
 const km = (a: Site, b: Site) => {
@@ -62,7 +64,7 @@ export function circle(lon: number, lat: number, radiusKm: number): Feature<Poly
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [pts] } }
 }
 
-export function buildIncidents(sites: Record<string, Site>): Incident[] {
+export function buildIncidents(sites: Record<string, Site>, currentDay?: string): Incident[] {
   const fires = Object.values(sites)
     .filter((s) => s.hotspot && s.triage?.verdict === 'possible_fire')
     .sort((a, b) => (a.alertAt ?? 0) - (b.alertAt ?? 0))
@@ -91,6 +93,7 @@ export function buildIncidents(sites: Record<string, Site>): Incident[] {
         rep,
         detections: g.reduce((a, s) => a + (s.hotspot!.detections ?? 1), 0),
         days: [...new Set(g.map((s) => s.hotspot!.acq_date).filter(Boolean) as string[])].sort(),
+        lastDay: [...g.map((s) => s.hotspot!.acq_date ?? '')].sort().at(-1) ?? '',
         maxFrp: Math.max(...g.map((s) => s.hotspot!.frp ?? 0)),
         center: [lon, lat] as [number, number],
         outline: hullOutline(g.map((s) => [s.hotspot!.lon, s.hotspot!.lat] as [number, number])),
@@ -98,5 +101,9 @@ export function buildIncidents(sites: Record<string, Site>): Incident[] {
       }
     })
     .sort((a, b) => a.first - b.first)
-    .map((inc, i) => ({ ...inc, id: `fire-${i + 1}`, n: i + 1 }))
+    .map((inc, i) => {
+      // Extinguished when the satellites have not seen it today or yesterday (replay days are sequential).
+      const quietDays = currentDay && inc.lastDay ? (Date.parse(currentDay) - Date.parse(inc.lastDay)) / 86400000 : 0
+      return { ...inc, id: `fire-${i + 1}`, n: i + 1, active: quietDays <= 1 }
+    })
 }

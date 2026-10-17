@@ -37,7 +37,7 @@ export default function App() {
 
   const sites = state.sites
   // Detections within 2 km are one fire: the UI counts and lists incidents, not satellite pixels.
-  const incidents = useMemo(() => buildIncidents(sites), [sites])
+  const incidents = useMemo(() => buildIncidents(sites, state.day?.date), [sites, state.day?.date])
   const alerts = incidents
   const [filter, setFilter] = useState<VerdictFilter>('all')
   const selected: Site | undefined = state.selectedId ? sites[state.selectedId] : undefined

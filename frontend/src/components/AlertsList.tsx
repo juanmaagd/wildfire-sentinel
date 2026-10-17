@@ -47,6 +47,7 @@ export default function AlertsList({ incidents, selectedId, lang, onSelect }: Pr
                   <span>{inc.detections} detections</span>
                   {days && <span>{days}</span>}
                   <span>max {inc.maxFrp.toFixed(1)} MW</span>
+                  <span className={inc.active ? 'text-lime' : 'text-ash'}>{inc.active ? 'active' : `extinguished · last seen ${inc.lastDay.slice(5)}`}</span>
                 </span>
               </span>
             </button>

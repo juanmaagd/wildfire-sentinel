@@ -68,11 +68,11 @@ interface Props {
 
 const incidentGeo = (incidents: Incident[]): FeatureCollection => ({
   type: 'FeatureCollection',
-  features: incidents.map((i) => ({ ...i.outline, properties: { rep: i.rep.id, n: i.n } })),
+  features: incidents.map((i) => ({ ...i.outline, properties: { rep: i.rep.id, n: i.n, active: i.active ? 1 : 0 } })),
 })
 const incidentCenters = (incidents: Incident[]): FeatureCollection => ({
   type: 'FeatureCollection',
-  features: incidents.map((i) => ({ type: 'Feature', properties: { rep: i.rep.id }, geometry: { type: 'Point', coordinates: i.center } })),
+  features: incidents.filter((i) => i.active).map((i) => ({ type: 'Feature', properties: { rep: i.rep.id }, geometry: { type: 'Point', coordinates: i.center } })),
 })
 const DOT_FILTER = {
   all: null,
@@ -125,8 +125,9 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
       map.addSource('inc', { type: 'geojson', data: EMPTY })
       map.addSource('inc-c', { type: 'geojson', data: EMPTY })
       // One fire incident = one translucent area + one pulse, instead of dozens of red dots.
-      map.addLayer({ id: 'inc-fill', type: 'fill', source: 'inc', paint: { 'fill-color': '#ff3b1f', 'fill-opacity': 0.16 } })
-      map.addLayer({ id: 'inc-line', type: 'line', source: 'inc', paint: { 'line-color': '#ff3b1f', 'line-width': 1.5, 'line-opacity': 0.8 } })
+      // Extinguished incidents turn into a grey burn scar; only active ones pulse.
+      map.addLayer({ id: 'inc-fill', type: 'fill', source: 'inc', paint: { 'fill-color': ['case', ['==', ['get', 'active'], 1], '#ff3b1f', '#84837b'], 'fill-opacity': ['case', ['==', ['get', 'active'], 1], 0.16, 0.22] } })
+      map.addLayer({ id: 'inc-line', type: 'line', source: 'inc', paint: { 'line-color': ['case', ['==', ['get', 'active'], 1], '#ff3b1f', '#84837b'], 'line-width': 1.5, 'line-opacity': 0.8 } })
       map.addLayer({
         id: 'fire-halo',
         type: 'circle',

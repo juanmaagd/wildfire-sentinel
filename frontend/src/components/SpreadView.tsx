@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Map as MLMap, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl'
 import { Pause, Play, X } from 'lucide-react'
 import { humanize } from '../lib/format'
+import WeatherTimeline, { type HourWeather } from './WeatherTimeline'
 
 export interface SpreadData {
   ignition: { lat: number; lon: number }
@@ -17,6 +18,8 @@ export interface SpreadData {
   observed?: FeatureCollection // what the satellite actually saw afterwards (properties.hours_after)
   observed_hits?: Record<string, [number, number]> // per horizon: [inside prediction, total]
   start?: string
+  weather_hourly?: HourWeather[]
+  rain_by_horizon?: Record<string, number>
 }
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
 const compass = (deg: number) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16]
@@ -65,7 +68,7 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
   const steps = [0, ...(data?.hours ?? [1, 3, 6])]
   const [source, setSource] = useState<'api' | 'demo' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [step, setStep] = useState(0)
+  const [hour, setHour] = useState(0) // continuous timeline position (hours after the prediction start)
   const [playing, setPlaying] = useState(false)
   const dataRef = useRef<SpreadData | null>(null)
 
@@ -185,7 +188,7 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
     const lons = coords.map((c) => c[0])
     const lats = coords.map((c) => c[1])
     m.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], {
-      padding: { top: 240, bottom: 260, left: 80, right: 80 },
+      padding: { top: 230, bottom: 400, left: 80, right: 80 },
       pitch: 55,
       bearing: head,
       duration: 0,
@@ -196,31 +199,39 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
   useEffect(() => {
     dataRef.current = data
     applyData()
-    setStep(0)
+    setHour(0)
   }, [data])
 
   useEffect(() => {
     const m = mapRef.current
     if (!m || !readyRef.current) return
-    const filter = ['<=', ['get', 'hours'], steps[step]]
+    const filter = ['<=', ['get', 'hours'], hour]
     m.setFilter('perim-fill', filter as never)
     m.setFilter('perim-line', filter as never)
-    m.setFilter('obs', ['<=', ['get', 'hours_after'], step > 0 ? steps[step] : -1] as never)
-  }, [step, data])
+    m.setFilter('obs', ['<=', ['get', 'hours_after'], hour > 0 ? hour : -1] as never)
+    // Burned more than 24 h ago = dark scar; the recent front stays bright.
+    const recent = ['>', ['get', 'hours'], hour - 24]
+    m.setPaintProperty('perim-fill', 'fill-color', ['case', recent, PERIM_COLOR, '#2a1410'] as never)
+    m.setPaintProperty('perim-fill', 'fill-opacity', ['case', recent, 0.38, 0.6] as never)
+    m.setPaintProperty('perim-line', 'line-color', ['case', recent, PERIM_COLOR, '#5a2a1c'] as never)
+  }, [hour, data])
 
-  // Timeline autoplay: advance through the steps, then stop.
+  // Timeline autoplay: sweep the hours (about 8 s for a week), then stop.
+  const maxHour = data ? Math.max(...data.hours) : 0
   useEffect(() => {
     if (!playing) return
-    if (step >= steps.length - 1) {
+    if (hour >= maxHour) {
       setPlaying(false)
       return
     }
-    const t = window.setTimeout(() => setStep((s) => s + 1), 1400)
+    const t = window.setTimeout(() => setHour((h) => Math.min(maxHour, h + 1)), 45)
     return () => window.clearTimeout(t)
-  }, [playing, step])
+  }, [playing, hour, maxHour])
 
+  const step = steps.reduce((acc, h, i) => (h <= hour ? i : acc), 0)
   const hits = data?.observed_hits?.[String(steps[step])]
   const area = data && step > 0 ? data.stats.area_ha[String(steps[step])] : 0
+  const now = data?.weather_hourly?.[Math.min(Math.floor(hour), (data.weather_hourly?.length ?? 1) - 1)]
   const wind = data?.wind
 
   return (
@@ -241,7 +252,13 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
               <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-bone" />real detections later</span>
             </div>
           )}
-          {wind && (
+          {now ? (
+            <div className="mt-3 font-mono text-[13px] uppercase tracking-wider tabular-nums text-bone">
+              <span className="text-ash">{now.time.slice(5).replace('T', ' ')} JST · +{Math.floor(hour)}h · </span>
+              wind {now.wind_speed_ms.toFixed(1)} m/s {compass(now.wind_from_deg)} · gusts {(now.wind_gust_ms ?? 0).toFixed(1)} · RH {Math.round(now.humidity_pct)}%
+              {now.precip_mm >= 0.5 && <span className="ml-2 text-[#6cb6ff]">· raining {now.precip_mm.toFixed(1)} mm/h — spread stalls</span>}
+            </div>
+          ) : wind && (
             <div className="mt-3 font-mono text-[13px] uppercase tracking-wider tabular-nums text-lime">
               Wind {wind.speed_ms.toFixed(1)} m/s from {compass(wind.from_deg)} · gusts {wind.gust_ms.toFixed(1)}
             </div>
@@ -267,14 +284,27 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
 
       {data && (
         <div className="absolute inset-x-0 bottom-0 p-6">
-          <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-4 bg-canvas/80 backdrop-blur-sm px-5 py-4">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 bg-canvas/80 backdrop-blur-sm px-5 py-3">
+            {data.weather_hourly && data.weather_hourly.length > 1 && (
+              <div className="w-full">
+                <WeatherTimeline
+                  hourly={data.weather_hourly}
+                  hour={hour}
+                  marks={data.hours}
+                  onHour={(h) => {
+                    setPlaying(false)
+                    setHour(h)
+                  }}
+                />
+              </div>
+            )}
             <button
               type="button"
               onClick={() => {
-                if (!playing && step >= steps.length - 1) setStep(0)
+                if (!playing && hour >= maxHour) setHour(0)
                 setPlaying((p) => !p)
               }}
-              className="flex size-12 items-center justify-center rounded-[3.6px] bg-lime text-canvas hover:bg-olive"
+              className="flex size-10 items-center justify-center rounded-[3.6px] bg-lime text-canvas hover:bg-olive"
               aria-label={playing ? 'Pause' : 'Play'}
             >
               {playing ? <Pause size={22} /> : <Play size={22} />}
@@ -286,9 +316,9 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
                   type="button"
                   onClick={() => {
                     setPlaying(false)
-                    setStep(i)
+                    setHour(h)
                   }}
-                  className={`border font-mono text-[13px] uppercase tracking-wider tabular-nums px-[14px] py-[10px] rounded-[3.6px] ${
+                  className={`border font-mono text-[12px] uppercase tracking-wider tabular-nums px-[10px] py-[7px] rounded-[3.6px] ${
                     i === step ? 'border-lime text-lime' : 'border-iron text-bone hover:border-bone'
                   }`}
                 >
@@ -297,7 +327,7 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
               ))}
             </div>
             <div className="ml-auto text-right">
-              <div className="font-mono font-light text-[56px] text-bone">
+              <div className="font-mono font-light text-[40px] leading-none text-bone">
                 {area ? area.toFixed(1) : '0.0'} <span className="font-mono text-lg text-ash">ha</span>
               </div>
               {hits && hits[1] > 0 && (

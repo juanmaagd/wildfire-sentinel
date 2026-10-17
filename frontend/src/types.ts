@@ -83,6 +83,8 @@ export interface DayInfo {
   index: number
   of: number
   date: string
+  detections?: number
+  rain_mm?: number
 }
 
 export interface FeedItem {
