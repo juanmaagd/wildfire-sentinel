@@ -19,19 +19,13 @@ Taglines (pick one, use it at the start and at the end):
 
 ## Open with the product (first 10 seconds)
 
-Say one of these with the app already on screen, then click straight into the alert.
+With the app already on screen:
 
 > **"This is Wildfire Sentinel. It's an AI that watches every wildfire signal in Japan, tells a fire chief which one is real, shows where it's going, and hands them the plan to stop it. In seconds."**
 
-> **"Every fire chief in Japan should have this on their phone: a wildfire alert that doesn't just say 'fire', it says 'here's where it goes, and here's how to stop it'."**
-
-> **"Most wildfire alerts tell you something is burning. Ours tells you what to do about it."**
-
-Short version, if you want to start punchier:
-
-> **"A wildfire alert that comes with the plan."**
-
 Then: *"Let me show you."* → click **Drill · Ashikaga**.
+
+Notice the hook already contains the whole demo, in order: **which one is real** (the alert) → **where it's going** (3D prediction) → **the plan to stop it** (response plan). Just follow it.
 
 ---
 
