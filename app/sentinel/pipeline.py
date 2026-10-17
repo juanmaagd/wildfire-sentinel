@@ -89,7 +89,7 @@ async def report_on_demand(hotspot_id: str) -> dict:
     report = {**cached["assessment"], **rep, "brief_pending": False, "model": model, "latency_ms": rep_ms,
               "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     return {"probe": cached["probe"], "report": report}
-MAX_REPORTS_PER_BATCH = 1
+PROBE_CONCURRENCY = 4  # every alert gets the deep probe; GSI/GIBS/Open-Meteo are public, so keep it gentle
 JEV_CONCURRENCY = 8
 
 
@@ -104,6 +104,7 @@ class Run:
                       "alerts": 0, "jev_calls": 0, "reports": 0, "elapsed_s": 0.0}
         self.started = time.perf_counter()
         self.background: list[asyncio.Task] = []
+        self.probe_sem = asyncio.Semaphore(PROBE_CONCURRENCY)
 
     async def summary(self) -> None:
         self.stats["elapsed_s"] = round(time.perf_counter() - self.started, 1)
@@ -163,14 +164,19 @@ class Run:
         sem = asyncio.Semaphore(JEV_CONCURRENCY)
         alerts = [a for a in await asyncio.gather(*(self.triage_one(h, mem, jv, sem) for h in hotspots)) if a]
         await self.summary()
-        detections = sum(h.detections for h in hotspots)
-        # Alerts are already on the map; deep analysis runs in the background so the next batch isn't blocked.
-        for h in sorted(alerts, key=lambda a: a.frp, reverse=True)[:MAX_REPORTS_PER_BATCH]:
+        # Replay: the batch is one fire on one day, so its detection count describes the fire. Live: the batch is
+        # all of Japan, so each alert counts only its own detections.
+        total = sum(h.detections for h in hotspots)
+        # Alerts are already on the map; deep analysis runs in the background (strongest first) so the next batch
+        # isn't blocked.
+        for h in sorted(alerts, key=lambda a: a.frp, reverse=True):
+            detections = total if self.mode == "replay" else h.detections
             self.background.append(asyncio.create_task(self._analyse_safe(h, mem, jv, day, detections)))
 
     async def _analyse_safe(self, h, mem, jv, day, detections) -> None:
         try:
-            await self.analyse(h, mem, jv, day, detections)
+            async with self.probe_sem:
+                await self.analyse(h, mem, jv, day, detections)
         except Exception as exc:
             await self.emit("analysis_error", {"id": h.id, "message": f"{type(exc).__name__}: {exc}"})
         await self.summary()

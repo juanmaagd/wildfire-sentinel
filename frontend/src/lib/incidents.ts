@@ -18,6 +18,7 @@ export interface Incident {
   lastDay: string // UTC acquisition date (compared with the replay day)
   firstSeenJst: string // 'MM-DD' in Japan time, for display
   lastSeenJst: string // 'MM-DD HH:MM' in Japan time, for display
+  lastSeenMs: number // latest detection time, for sorting
   active: boolean // detected on the current replay day (or the day before); false = extinguished
 }
 
@@ -112,8 +113,9 @@ export function buildIncidents(sites: Record<string, Site>, currentDay?: string)
     })
 }
 
-function seenJst(g: Site[]): { firstSeenJst: string; lastSeenJst: string } {
+function seenJst(g: Site[]): { firstSeenJst: string; lastSeenJst: string; lastSeenMs: number } {
   const times = g.map((s) => acqDate(s.hotspot!)).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime())
-  if (!times.length) return { firstSeenJst: '', lastSeenJst: '' }
-  return { firstSeenJst: toJst(times[0]).slice(5, 10), lastSeenJst: toJst(times[times.length - 1]).slice(5, 16) }
+  if (!times.length) return { firstSeenJst: '', lastSeenJst: '', lastSeenMs: 0 }
+  const last = times[times.length - 1]
+  return { firstSeenJst: toJst(times[0]).slice(5, 10), lastSeenJst: toJst(last).slice(5, 16), lastSeenMs: last.getTime() }
 }

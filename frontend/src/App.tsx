@@ -8,7 +8,8 @@ import DetailPanel from './components/DetailPanel'
 import Feed from './components/Feed'
 import SpreadView from './components/SpreadView'
 import FireGraphView from './components/FireGraphView'
-import { buildIncidents } from './lib/incidents'
+import { buildIncidents, type Incident } from './lib/incidents'
+import { urgencyOf } from './lib/format'
 import type { VerdictFilter } from './components/HotspotMap'
 import { useRun } from './useRun'
 import type { Focus, Site } from './types'
@@ -25,6 +26,7 @@ export default function App() {
   const [kpisOpen, setKpisOpen] = useState(false)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [feedOpen, setFeedOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<SortKey>('urgency')
   const [toastId, setToastId] = useState<string | null>(null)
 
   // Replay start flies the 2D map to Ofunato.
@@ -199,8 +201,24 @@ export default function App() {
               <span>Fires · {alerts.length}</span>
               <button type="button" onClick={() => setAlertsOpen(false)} aria-label="Close alerts"><X className="size-4" /></button>
             </div>
+            <div className="flex items-center gap-2 border-b border-iron px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-ash">
+              <span>Sort</span>
+              <div className="flex border border-iron" role="group" aria-label="Sort fires">
+                {SORTS.map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={sortBy === k}
+                    onClick={() => setSortBy(k)}
+                    className={`px-2 py-[3px] ${sortBy === k ? 'bg-lime text-canvas' : 'text-bone hover:text-lime'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <AlertsList incidents={incidents} selectedId={state.selectedId} lang={state.lang} onSelect={pickFromList} />
+              <AlertsList incidents={sortIncidents(incidents, sortBy)} selectedId={state.selectedId} lang={state.lang} onSelect={pickFromList} />
             </div>
           </aside>
         )}
@@ -289,4 +307,21 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
       <span className={`text-[28px] font-light leading-none ${accent ? 'text-lime' : 'text-bone'}`}>{value}</span>
     </span>
   )
+}
+
+type SortKey = 'urgency' | 'recent' | 'intensity' | 'size'
+const SORTS: [SortKey, string][] = [['urgency', 'Urgency'], ['recent', 'Recent'], ['intensity', 'Intensity'], ['size', 'Size']]
+
+// Fires drawer order. Urgency ties fall back to intensity; alerts still being analysed sort as urgency 0.
+function sortIncidents(list: Incident[], by: SortKey): Incident[] {
+  const key = (i: Incident): number[] =>
+    by === 'urgency' ? [Math.max(...i.sites.map(urgencyOf)), i.maxFrp]
+    : by === 'recent' ? [i.lastSeenMs]
+    : by === 'intensity' ? [i.maxFrp]
+    : [i.detections]
+  return [...list].sort((a, b) => {
+    const ka = key(a), kb = key(b)
+    for (let n = 0; n < ka.length; n++) if (kb[n] !== ka[n]) return kb[n] - ka[n]
+    return 0
+  })
 }

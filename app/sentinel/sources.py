@@ -93,12 +93,15 @@ def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768)
     cx, cy = _center_pixel(lat, lon, zoom)
     tx0, ty0 = int(cx // TILE) - 2, int(cy // TILE) - 2
     canvas = Image.new("RGB", (TILE * 4, TILE * 4))
+    center = (int(cx // TILE) - tx0, int(cy // TILE) - ty0)
     with httpx.Client(timeout=15) as client:
         for dy in range(4):
             for dx in range(4):
                 resp = client.get(GSI_TILE.format(z=zoom, x=tx0 + dx, y=ty0 + dy))
                 if resp.status_code == 404:
-                    raise OutsideJapan(f"{lat},{lon}")
+                    if (dx, dy) == center:  # no photo under the point itself: not Japan
+                        raise OutsideJapan(f"{lat},{lon}")
+                    continue  # open sea at the edge of a wide view: leave it dark
                 resp.raise_for_status()
                 canvas.paste(Image.open(io.BytesIO(resp.content)).convert("RGB"), (dx * TILE, dy * TILE))
     px, py = cx - tx0 * TILE, cy - ty0 * TILE
