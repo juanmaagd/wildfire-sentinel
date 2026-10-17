@@ -73,31 +73,34 @@ def _hour_params(w: dict, fuel: float, rain_7d: float, rain_24h: float = 0.0) ->
     return r_head, math.sin(to), math.cos(to), math.sqrt(lb * lb - 1) / lb
 
 
-def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str = "conifer_forest",
-             seeds: list[tuple[float, float]] | None = None, observed: dict | None = None, speed: float = SPEED) -> dict:
-    """`seeds`: every burning point seen at t=0 (multi-point ignition); defaults to the alert location."""
-    started = time.perf_counter()
+def _prepare(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str,
+             seeds: list[tuple[float, float]] | None, speed: float) -> dict:
     dem, cell_m, ox, oy = _dem(lat, lon)
     H, W = dem.shape
     px, py = _merc_px(lat, lon, ZOOM)
     ign = (int((py - oy) / DOWNSAMPLE), int((px - ox) / DOWNSAMPLE))
-
     fuel = scoring.FUEL.get(fuel_type, 0.7)
     rain_24h = [sum((x.get("precip_mm") or 0) for x in hourly[max(0, i - 24): i + 1]) for i in range(len(hourly))]
     params = [_hour_params(w, fuel, rain_7d, rain_24h[i]) for i, w in enumerate(hourly)] or [_hour_params(
         {"humidity_pct": 50, "wind_speed_ms": 3, "wind_from_deg": 270}, fuel, rain_7d)]
     params = [(p[0] * speed, *p[1:]) for p in params]
-
-    burnable = dem > 0.5
-    T = np.full((H, W), np.inf)
     starts = {ign}
     for s_lat, s_lon in seeds or []:
         sx, sy = _merc_px(s_lat, s_lon, ZOOM)
         cell = (int((sy - oy) / DOWNSAMPLE), int((sx - ox) / DOWNSAMPLE))
         if 0 <= cell[0] < H and 0 <= cell[1] < W:
             starts.add(cell)
+    return {"dem": dem, "cell_m": cell_m, "ox": ox, "oy": oy, "ign": ign, "params": params, "starts": starts,
+            "burnable": dem > 0.5}
+
+
+def _arrival(ctx: dict, burnable: np.ndarray) -> np.ndarray:
+    """Minimum travel time (minutes) from the starts to every cell, with the weather of each hour."""
+    dem, cell_m, params = ctx["dem"], ctx["cell_m"], ctx["params"]
+    H, W = dem.shape
+    T = np.full((H, W), np.inf)
     pq = []
-    for cell in starts:
+    for cell in ctx["starts"]:
         T[cell] = 0.0
         pq.append((0.0, *cell))
     horizon = 60 * max(HOURS) + 1
@@ -121,29 +124,53 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
             if nt < T[rr, cc]:
                 T[rr, cc] = nt
                 heapq.heappush(pq, (nt, rr, cc))
-    w0 = hourly[0] if hourly else {"wind_from_deg": 270, "wind_speed_ms": 3, "wind_gust_ms": 5}
-    we, wn = params[0][1], params[0][2]
+    return T
 
+
+def _lonlat_fn(ctx: dict):
     def to_lonlat(r: float, c: float) -> list[float]:
-        lo, la = _px_to_lonlat(ox + (c + 0.5) * DOWNSAMPLE, oy + (r + 0.5) * DOWNSAMPLE, ZOOM)
+        lo, la = _px_to_lonlat(ctx["ox"] + (c + 0.5) * DOWNSAMPLE, ctx["oy"] + (r + 0.5) * DOWNSAMPLE, ZOOM)
         return [round(float(lo), 5), round(float(la), 5)]
+    return to_lonlat
 
-    features, areas, head = [], {}, [to_lonlat(*ign)]
-    seed_points = [to_lonlat(*c) for c in starts]
-    cell_ha = cell_m * cell_m / 1e4
+
+def _polygons(mask: np.ndarray, to_lonlat) -> list:
+    contours = [c for c in measure.find_contours(np.pad(mask.astype(float), 1), 0.5) if len(c) >= 4]
+    polys = []
+    for contour in contours:  # several fronts can burn separately (multi-point ignition)
+        ring = [to_lonlat(r - 1, c - 1) for r, c in contour]
+        ring.append(ring[0])
+        polys.append([ring])
+    return polys
+
+
+def _perimeters(T: np.ndarray, ctx: dict, to_lonlat) -> tuple[list, dict]:
+    features, areas = [], {}
+    cell_ha = ctx["cell_m"] ** 2 / 1e4
     for h in HOURS:
         burned = T <= 60 * h
         areas[str(h)] = round(float(burned.sum()) * cell_ha, 1)
-        contours = [c for c in measure.find_contours(np.pad(burned.astype(float), 1), 0.5) if len(c) >= 4]
-        if not contours:
-            continue
-        polys = []
-        for contour in contours:  # several fronts can burn separately (multi-point ignition)
-            ring = [to_lonlat(r - 1, c - 1) for r, c in contour]
-            ring.append(ring[0])
-            polys.append([ring])
-        features.append({"type": "Feature", "properties": {"hours": h, "area_ha": areas[str(h)]},
-                         "geometry": {"type": "MultiPolygon", "coordinates": polys}})
+        polys = _polygons(burned, to_lonlat)
+        if polys:
+            features.append({"type": "Feature", "properties": {"hours": h, "area_ha": areas[str(h)]},
+                             "geometry": {"type": "MultiPolygon", "coordinates": polys}})
+    return features, areas
+
+
+def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str = "conifer_forest",
+             seeds: list[tuple[float, float]] | None = None, observed: dict | None = None, speed: float = SPEED) -> dict:
+    """`seeds`: every burning point seen at t=0 (multi-point ignition); defaults to the alert location."""
+    started = time.perf_counter()
+    ctx = _prepare(lat, lon, hourly, rain_7d, fuel_type, seeds, speed)
+    dem, cell_m, ox, oy, ign, params, starts = (ctx[k] for k in ("dem", "cell_m", "ox", "oy", "ign", "params", "starts"))
+    T = _arrival(ctx, ctx["burnable"])
+    w0 = hourly[0] if hourly else {"wind_from_deg": 270, "wind_speed_ms": 3, "wind_gust_ms": 5}
+    we, wn = params[0][1], params[0][2]
+
+    to_lonlat = _lonlat_fn(ctx)
+    head = [to_lonlat(*ign)]
+    seed_points = [to_lonlat(*c) for c in starts]
+    features, areas = _perimeters(T, ctx, to_lonlat)
     for h in range(1, max(HOURS) + 1, 2):
         rows, cols = np.nonzero(T <= 60 * h)
         if len(rows):
@@ -218,4 +245,69 @@ def replay_context(lat: float, lon: float, day: str, span: float = 0.2) -> dict:
         "start_jst": jst.strftime("%Y-%m-%dT%H:00"),
         "start_label": jst.strftime("%Y-%m-%d %H:%M JST"),
         "observed": {"type": "FeatureCollection", "features": feats},
+    }
+
+
+LEAD_H = 3  # hours a crew needs to cut a control line before the front reaches it
+HAND_CREW_KM_H, DOZER_KM_H = 0.3, 1.0
+WIND_SHIFT_DEG = 60  # typical line production rates (hand crew vs bulldozer)
+
+
+def plan(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str = "conifer_forest",
+         seeds: list[tuple[float, float]] | None = None, at_hour: int = 0, lead_h: int = LEAD_H) -> dict:
+    """Response plan decided at `at_hour`: a control line cut where the head and flanks will be `lead_h` hours later,
+    then the same weather re-simulated with that line as non-burnable fuel. Returns geometry and with/without numbers."""
+    started = time.perf_counter()
+    ctx = _prepare(lat, lon, hourly, rain_7d, fuel_type, seeds, SPEED)
+    T0 = _arrival(ctx, ctx["burnable"])
+    to_lonlat = _lonlat_fn(ctx)
+    t_plan, t_line = 60 * at_hour, 60 * (at_hour + lead_h)
+    burning = T0 <= t_plan
+    inside = T0 <= t_line
+    grown = inside.copy()
+    for dr in (-1, 0, 1):
+        for dc in (-1, 0, 1):
+            grown |= np.roll(np.roll(inside, dr, axis=0), dc, axis=1)
+    ring = grown & ~inside & ctx["burnable"]
+    # Head + flanks only: the rear spreads slowly and is held by direct attack from the anchor point.
+    # A forecast wind shift turns a flank or the rear into the new head, so then the line encircles the fire.
+    _, we, wn, ecc = ctx["params"][min(at_hour, len(ctx["params"]) - 1)]
+    window = hourly[at_hour: at_hour + 12]
+    dirs = [w["wind_from_deg"] for w in window]
+    shift = max((abs((d - dirs[0] + 180) % 360 - 180) for d in dirs), default=0)
+    encircle = shift >= WIND_SHIFT_DEG
+    rows, cols = np.nonzero(burning if burning.any() else inside)
+    cr, cc = rows.mean(), cols.mean()
+    rr, rc = np.nonzero(ring)
+    east, north = rc - cc, cr - rr
+    norm = np.hypot(east, north) + 1e-9
+    front = ((east * we + north * wn) / norm >= -0.35) | encircle
+    line = np.zeros_like(ring)
+    line[rr[front], rc[front]] = True
+    T1 = _arrival(ctx, ctx["burnable"] & ~line)
+
+    base_features, base_areas = _perimeters(T0, ctx, to_lonlat)
+    plan_features, plan_areas = _perimeters(T1, ctx, to_lonlat)
+    line_km = round(float(line.sum()) * ctx["cell_m"] / 1000, 1)
+    cell_ha = ctx["cell_m"] ** 2 / 1e4
+    return {
+        "at_hour": at_hour, "lead_h": lead_h,
+        "plan_time": hourly[at_hour]["time"] if at_hour < len(hourly) else None,
+        "burning_ha": round(float(burning.sum()) * cell_ha, 1),
+        "control_line": {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"lead_h": lead_h},
+                         "geometry": {"type": "MultiPolygon", "coordinates": _polygons(line, to_lonlat)}}]},
+        "with_plan": {"type": "FeatureCollection", "features": plan_features},
+        "area_ha": {"no_action": base_areas, "with_plan": plan_areas},
+        "line_km": line_km, "line_type": "full perimeter (wind shift)" if encircle else "head and flanks",
+        "crews": {"hand_crews": max(1, math.ceil(line_km / (HAND_CREW_KM_H * lead_h))),
+                  "bulldozers": max(1, math.ceil(line_km / (DOZER_KM_H * lead_h)))},
+        "head_direction_deg": round(math.degrees(math.atan2(we, wn)) % 360),
+        "weather_next_12h": {
+            "max_wind_ms": max((w["wind_speed_ms"] for w in window), default=None),
+            "max_gust_ms": max((w.get("wind_gust_ms") or 0 for w in window), default=None),
+            "min_humidity_pct": min((w["humidity_pct"] for w in window), default=None),
+            "wind_shift_deg": round(shift),
+            "rain_mm": round(sum(w.get("precip_mm") or 0 for w in window), 1),
+        },
+        "elapsed_ms": int((time.perf_counter() - started) * 1000),
     }

@@ -245,6 +245,7 @@ export default function App() {
           lon={spreadFrom.lon}
           day={spreadFrom.day}
           fuel={fuelValue}
+          siteId={selected.id}
           forceMock={isMock}
           onClose={() => setSpreadOpen(false)}
         />

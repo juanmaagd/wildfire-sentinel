@@ -81,3 +81,54 @@ async def report(facts: dict, wide_image_path, use_vision: bool = False) -> tupl
         )
         model = TEXT_MODEL
     return json.loads(r.choices[0].message.content), model, int((time.perf_counter() - started) * 1000)
+
+
+PLAN_SYSTEM = (
+    "You are a wildfire incident commander advising Japanese fire departments (消防本部) and municipal disaster offices. "
+    "You receive a computed response plan: a control line placed by a spread simulation, the burned area with and "
+    "without it, crews needed to cut it in time, the weather window and what a fast vision model saw in aerial photos. "
+    "Write a concrete tactical plan as an experienced commander would: anchor point, control line (fuel break cut, "
+    "cleared vegetation), direct attack where safe, aerial water drops by helicopter while the fire is small, "
+    "structure protection for nearby houses, and crew safety (LCES: lookouts, communications, escape routes, safety zones). "
+    "Use ONLY the numbers given; never invent places, times or resources beyond them. "
+    "Write every field in English except objective_ja and brief_ja, which are natural, formal Japanese. "
+    "Give 3 to 5 tactics, each field one short sentence (at most 25 words). Directions as compass words (north-west), not degrees."
+)
+
+PLAN_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "response_plan",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "objective_en": {"type": "string", "description": "One sentence: what the plan achieves"},
+                "objective_ja": {"type": "string"},
+                "tactics": {"type": "array", "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "e.g. Control line, Aerial drops, Structure protection"},
+                        "when": {"type": "string"}, "where": {"type": "string"},
+                        "resources": {"type": "string"}, "why": {"type": "string"},
+                    },
+                    "required": ["name", "when", "where", "resources", "why"], "additionalProperties": False}},
+                "weather_watch": {"type": "string"},
+                "crew_safety": {"type": "string"},
+                "brief_ja": {"type": "string", "description": "3 lines for the commander, Japanese"},
+            },
+            "required": ["objective_en", "objective_ja", "tactics", "weather_watch", "crew_safety", "brief_ja"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+async def response_plan(facts: dict) -> tuple[dict, str, int]:
+    started = time.perf_counter()
+    r = await _ai().chat.completions.create(
+        model=TEXT_MODEL, response_format=PLAN_SCHEMA, reasoning_effort="none",
+        messages=[{"role": "system", "content": PLAN_SYSTEM},
+                  {"role": "user", "content": f"Plan facts:\n{json.dumps(facts, ensure_ascii=False, default=str)}"}],
+    )
+    return json.loads(r.choices[0].message.content), TEXT_MODEL, int((time.perf_counter() - started) * 1000)

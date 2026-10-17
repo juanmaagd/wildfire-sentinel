@@ -21,6 +21,30 @@ export interface SpreadData {
   weather_hourly?: HourWeather[]
   rain_by_horizon?: Record<string, number>
 }
+export interface Tactic { name: string; when: string; where: string; resources: string; why: string }
+export interface PlanData {
+  at_hour: number
+  lead_h: number
+  plan_time: string | null
+  burning_ha: number
+  control_line: FeatureCollection
+  with_plan: FeatureCollection
+  area_ha: { no_action: Record<string, number>; with_plan: Record<string, number> }
+  line_km: number
+  line_type: string
+  crews: { hand_crews: number; bulldozers: number }
+  weather_next_12h: { max_gust_ms: number; wind_shift_deg: number; rain_mm: number; min_humidity_pct: number }
+  brief: null | {
+    objective_en: string
+    objective_ja: string
+    tactics: Tactic[]
+    weather_watch: string
+    crew_safety: string
+    brief_ja: string
+    latency_ms: number
+  }
+  brief_error?: string
+}
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
 const compass = (deg: number) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16]
 
@@ -56,11 +80,12 @@ interface Props {
   lon: number
   day?: string
   fuel?: string
+  siteId?: string
   forceMock: boolean
   onClose: () => void
 }
 
-export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: Props) {
+export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onClose }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const readyRef = useRef(false)
@@ -71,6 +96,31 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
   const [hour, setHour] = useState(0) // continuous timeline position (hours after the prediction start)
   const [playing, setPlaying] = useState(false)
   const dataRef = useRef<SpreadData | null>(null)
+  // Response plan: on demand, decided at the timeline hour the user is looking at.
+  const [plan, setPlan] = useState<PlanData | null>(null)
+  const [planLoading, setPlanLoading] = useState(false)
+  const [planError, setPlanError] = useState<string | null>(null)
+  const [showPlan, setShowPlan] = useState(false)
+
+  const requestPlan = async () => {
+    const q = new URLSearchParams({ lat: String(lat), lon: String(lon), at_hour: String(Math.floor(hour)) })
+    if (day) q.set('day', day)
+    if (fuel) q.set('fuel', fuel)
+    if (siteId) q.set('id', siteId)
+    setPlaying(false)
+    setPlanLoading(true)
+    setPlanError(null)
+    try {
+      const res = await fetch(`/api/plan?${q}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setPlan((await res.json()) as PlanData)
+      setShowPlan(true)
+    } catch (err) {
+      setPlanError((err as Error).message)
+    } finally {
+      setPlanLoading(false)
+    }
+  }
 
   // Fetch the prediction; fall back to the bundled demo model on any failure.
   useEffect(() => {
@@ -130,6 +180,7 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
       map.addSource('ign', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('seeds', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('obs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addSource('ctl', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({ id: 'perim-fill', type: 'fill', source: 'perim', filter: ['<=', ['get', 'hours'], 0], paint: { 'fill-color': PERIM_COLOR as never, 'fill-opacity': 0.35 } })
       map.addLayer({ id: 'perim-line', type: 'line', source: 'perim', filter: ['<=', ['get', 'hours'], 0], paint: { 'line-color': PERIM_COLOR as never, 'line-width': 2.5 } })
       map.addLayer({ id: 'head-line', type: 'line', source: 'head', paint: { 'line-color': '#ffd000', 'line-width': 3 } })
@@ -138,6 +189,9 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
       // Prediction vs reality: burning at t=0 (orange) and later satellite detections (white) revealed with the timeline.
       map.addLayer({ id: 'seeds', type: 'circle', source: 'seeds', paint: { 'circle-radius': 4, 'circle-color': '#ff8a1f', 'circle-stroke-color': '#13140e', 'circle-stroke-width': 1 } })
       map.addLayer({ id: 'obs', type: 'circle', source: 'obs', filter: ['<=', ['get', 'hours_after'], -1], paint: { 'circle-radius': 5, 'circle-color': '#f4f3e8', 'circle-stroke-color': '#13140e', 'circle-stroke-width': 1.5 } })
+      // Control line of the response plan (UI accent: it is an action, not fire data).
+      map.addLayer({ id: 'ctl-fill', type: 'fill', source: 'ctl', paint: { 'fill-color': '#ebfc72', 'fill-opacity': 0.55 } })
+      map.addLayer({ id: 'ctl-line', type: 'line', source: 'ctl', paint: { 'line-color': '#ebfc72', 'line-width': 2 } })
       readyRef.current = true
       applyData()
     })
@@ -202,6 +256,15 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
     setHour(0)
   }, [data])
 
+  // Swap the drawn perimeters between the unattended prediction and the one with the control line.
+  useEffect(() => {
+    const m = mapRef.current
+    if (!m || !readyRef.current || !data) return
+    const on = showPlan && plan
+    ;(m.getSource('perim') as GeoJSONSource).setData(on ? plan.with_plan : data.perimeters)
+    ;(m.getSource('ctl') as GeoJSONSource).setData(on ? plan.control_line : { type: 'FeatureCollection', features: [] })
+  }, [showPlan, plan, data])
+
   useEffect(() => {
     const m = mapRef.current
     if (!m || !readyRef.current) return
@@ -230,7 +293,9 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
 
   const step = steps.reduce((acc, h, i) => (h <= hour ? i : acc), 0)
   const hits = data?.observed_hits?.[String(steps[step])]
-  const area = data && step > 0 ? data.stats.area_ha[String(steps[step])] : 0
+  const baseArea = data && step > 0 ? data.stats.area_ha[String(steps[step])] : 0
+  const planArea = plan && step > 0 ? plan.area_ha.with_plan[String(steps[step])] : undefined
+  const area = showPlan && planArea !== undefined ? planArea : baseArea
   const now = data?.weather_hourly?.[Math.min(Math.floor(hour), (data.weather_hourly?.length ?? 1) - 1)]
   const wind = data?.wind
 
@@ -272,6 +337,47 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
           <X size={18} /> Close
         </button>
       </div>
+
+      {plan && showPlan && (
+        <aside className="absolute bottom-[200px] right-6 top-[96px] flex w-[400px] flex-col bg-canvas/90 backdrop-blur-sm">
+          <div className="border-b border-iron px-4 py-3 font-mono text-[12px] uppercase tracking-wider text-ash">
+            Response plan · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${plan.plan_time.slice(5).replace('T', ' ')} JST` : ''}
+          </div>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+            <div className="grid grid-cols-3 gap-3 font-mono tabular-nums">
+              <PlanStat label="Control line" value={`${plan.line_km} km`} />
+              <PlanStat label="Hand crews" value={String(plan.crews.hand_crews)} />
+              <PlanStat label="Bulldozers" value={String(plan.crews.bulldozers)} />
+            </div>
+            <div className="font-mono text-[12px] uppercase tracking-wider text-ash">
+              {plan.line_type} · ready in {plan.lead_h}h · burning now {plan.burning_ha} ha
+            </div>
+            {plan.brief ? (
+              <>
+                <p className="text-[15px] leading-snug text-bone">{plan.brief.objective_en}</p>
+                <p className="text-[13px] leading-snug text-ash">{plan.brief.objective_ja}</p>
+                <ol className="space-y-3">
+                  {plan.brief.tactics.map((t, i) => (
+                    <li key={i} className="border-l-2 border-lime pl-3">
+                      <div className="text-[14px] text-bone">{t.name}</div>
+                      <div className="font-mono text-[11px] uppercase tracking-wider text-lime">{t.when}</div>
+                      <div className="mt-1 text-[13px] leading-snug text-ash">{t.where}</div>
+                      <div className="text-[13px] leading-snug text-ash">{t.resources}</div>
+                      <div className="text-[13px] leading-snug text-bone/80">{t.why}</div>
+                    </li>
+                  ))}
+                </ol>
+                <PlanNote label="Weather watch" text={plan.brief.weather_watch} />
+                <PlanNote label="Crew safety · LCES" text={plan.brief.crew_safety} />
+                <PlanNote label="指揮官ブリーフ" text={plan.brief.brief_ja} />
+                <div className="font-mono text-[11px] uppercase tracking-wider text-ash">Tactics by ai& · {plan.brief.latency_ms} ms</div>
+              </>
+            ) : (
+              <div className="font-mono text-[12px] text-ash">Tactical brief unavailable ({plan.brief_error})</div>
+            )}
+          </div>
+        </aside>
+      )}
 
       {!data && (
         <div className="absolute inset-0 flex items-center justify-center bg-canvas/80">
@@ -326,10 +432,42 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
                 </button>
               ))}
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={requestPlan}
+                disabled={planLoading || forceMock}
+                className="flex items-center gap-2 rounded-[3.6px] border border-lime px-[12px] py-[7px] font-mono text-[12px] uppercase tracking-wider text-lime hover:bg-lime hover:text-canvas disabled:opacity-50"
+              >
+                {planLoading && <span className="size-3 animate-spin rounded-[50%] border-2 border-iron border-t-lime" />}
+                {planLoading ? 'Planning…' : `Plan response at +${Math.floor(hour)}h`}
+              </button>
+              {plan && (
+                <div className="flex border border-iron" role="group" aria-label="Scenario">
+                  {([[false, 'No action'], [true, 'With plan']] as const).map(([v, label]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      aria-pressed={showPlan === v}
+                      onClick={() => setShowPlan(v)}
+                      className={`px-3 py-[7px] font-mono text-[12px] uppercase tracking-wider ${showPlan === v ? 'bg-lime text-canvas' : 'text-bone hover:text-lime'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {planError && <span className="font-mono text-[12px] text-ash">plan failed: {planError}</span>}
+            </div>
             <div className="ml-auto text-right">
               <div className="font-mono font-light text-[40px] leading-none text-bone">
                 {area ? area.toFixed(1) : '0.0'} <span className="font-mono text-lg text-ash">ha</span>
               </div>
+              {showPlan && planArea !== undefined && baseArea > planArea && (
+                <div className="font-mono text-[13px] uppercase tracking-wider text-lime">
+                  vs {baseArea.toFixed(1)} ha with no action · −{Math.round(100 * (1 - planArea / baseArea))}%
+                </div>
+              )}
               {hits && hits[1] > 0 && (
                 <div className="font-mono text-[13px] uppercase tracking-wider text-lime">
                   Satellite check · {hits[0]}/{hits[1]} real detections inside ({Math.round((100 * hits[0]) / hits[1])}%)
@@ -343,6 +481,24 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function PlanStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wider text-ash">{label}</div>
+      <div className="text-[22px] font-light leading-none text-bone">{value}</div>
+    </div>
+  )
+}
+
+function PlanNote({ label, text }: { label: string; text: string }) {
+  return (
+    <div>
+      <div className="font-mono text-[11px] uppercase tracking-wider text-ash">{label}</div>
+      <p className="mt-1 text-[13px] leading-snug text-bone/90">{text}</p>
     </div>
   )
 }
