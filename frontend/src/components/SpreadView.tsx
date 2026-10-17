@@ -96,11 +96,12 @@ interface Props {
   day?: string
   fuel?: string
   siteId?: string
+  focus?: { lat: number; lon: number } // the site the user selected: the camera starts on it
   forceMock: boolean
   onClose: () => void
 }
 
-export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onClose }: Props) {
+export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMock, onClose }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const readyRef = useRef(false)
@@ -254,8 +255,12 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
       type: 'FeatureCollection',
       features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [d.ignition.lon, d.ignition.lat] } }],
     })
-    // Camera: frame the whole predicted area (largest horizon) plus real detections, clear of the panels.
+    // Camera: start on the selected site (zoomed in, looking along the fire's head); without one, frame everything.
     const head = d.stats.head_direction_deg
+    if (focus) {
+      m.jumpTo({ center: [focus.lon, focus.lat], zoom: 13.4, pitch: 60, bearing: head, padding: { top: 120, bottom: 360, left: 420, right: 40 } })
+      return
+    }
     const coords: [number, number][] = [[d.ignition.lon, d.ignition.lat]]
     const walk = (c: unknown): void => {
       if (Array.isArray(c) && typeof c[0] === 'number') coords.push([c[0] as number, c[1] as number])

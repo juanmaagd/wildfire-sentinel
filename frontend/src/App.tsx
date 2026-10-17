@@ -255,6 +255,7 @@ export default function App() {
           // does not represent a 3,000 ha fire. Drill/live: the Jev fuel of the alerted site.
           fuel={replay ? undefined : fuelValue}
           siteId={selected.id}
+          focus={selected.hotspot ? { lat: selected.hotspot.lat, lon: selected.hotspot.lon } : undefined}
           forceMock={isMock}
           onClose={() => setSpreadOpen(false)}
         />

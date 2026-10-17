@@ -45,7 +45,7 @@ Spoken lines are plain text. Stage directions are in [brackets]. Drill numbers c
 
 [Open the incident → 3D prediction → slide to +120 h. Point at "Satellite check".]
 
-"We seed the model with the first satellite pass and check it against reality. Thirty hours later it predicted about 1,140 hectares; the official figure was 1,200. After that it over-predicts, because the model has no firefighters, and we show that too."
+"We seed the model with the first satellite pass and check it against reality. Thirty hours later it predicted about 1,140 hectares; the official figure was 1,200. After that the real fire stays smaller: our curve is the fire with no firefighting, so the gap shows what suppression changed, together with the model's own error."
 
 [Point at the Reality check panel: the orange curve against the official dots.]
 

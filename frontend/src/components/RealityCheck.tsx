@@ -76,7 +76,7 @@ export default function RealityCheck({ points, areaByHour, hour }: Props) {
       </div>
       {worst > 1.2 && (
         <div className="mt-1 max-w-[360px] text-[12px] leading-snug text-ash">
-          Later it over-predicts (up to ×{worst.toFixed(1)}): the model has no firefighting. Sources: {points.map((p) => p.source).join('; ')}.
+          The curve is the fire with no firefighting: weather and terrain only. After the first day the real fire stayed smaller (up to ×{worst.toFixed(1)} gap); that gap includes the effect of suppression, and model error. Sources: {points.map((p) => p.source).join('; ')}.
         </div>
       )}
     </div>
