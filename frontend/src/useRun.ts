@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef } from 'react'
+import { useCallback, useReducer, useRef, useState } from 'react'
 import { initialState, reducer } from './state'
 import type { Mode } from './types'
 
@@ -12,6 +12,11 @@ export function useRun() {
   const timerRef = useRef<number | null>(null)
   const startedRef = useRef(0)
   const frozenRef = useRef(false)
+  // Pause: incoming events are buffered (the backend keeps streaming) and the clock stops; resume replays them paced.
+  const [paused, setPaused] = useState(false)
+  const pausedRef = useRef(false)
+  const pausedAtRef = useRef(0)
+  const bufferRef = useRef<{ runId: number; name: string; data: unknown }[]>([])
 
   const now = () => (performance.now() - startedRef.current) / 1000
 
@@ -35,6 +40,10 @@ export function useRun() {
 
   const handle = (runId: number, name: string, data: unknown) => {
     if (runId !== runRef.current) return
+    if (pausedRef.current) {
+      bufferRef.current.push({ runId, name, data })
+      return
+    }
     if (name === 'summary') frozenRef.current = true
     dispatch({ type: 'event', name, data, at: now() })
     if (name === 'done') finish('done', 'Run complete')
@@ -47,9 +56,12 @@ export function useRun() {
     stopTimer()
     startedRef.current = performance.now()
     frozenRef.current = false
+    pausedRef.current = false
+    setPaused(false)
+    bufferRef.current = []
     dispatch({ type: 'start', runId, mode, at: 0 })
     timerRef.current = window.setInterval(() => {
-      if (!frozenRef.current && runId === runRef.current) dispatch({ type: 'tick', elapsed: now() })
+      if (!frozenRef.current && !pausedRef.current && runId === runRef.current) dispatch({ type: 'tick', elapsed: now() })
     }, 100)
 
     if (MOCK) {
@@ -105,6 +117,27 @@ export function useRun() {
     }
   }
 
+  const togglePause = useCallback(() => {
+    if (!pausedRef.current) {
+      pausedRef.current = true
+      pausedAtRef.current = performance.now()
+      setPaused(true)
+      return
+    }
+    pausedRef.current = false
+    startedRef.current += performance.now() - pausedAtRef.current // paused time doesn't count as elapsed
+    setPaused(false)
+    const drain = () => {
+      if (pausedRef.current) return
+      const next = bufferRef.current.shift()
+      if (!next) return
+      handle(next.runId, next.name, next.data)
+      window.setTimeout(drain, 40)
+    }
+    drain()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const select = useCallback((id: string | null) => dispatch({ type: 'select', id }), [])
   const setLang = useCallback((lang: 'en' | 'ja') => {
     try {
@@ -117,5 +150,5 @@ export function useRun() {
 
   // Feed out-of-stream payloads (e.g. an on-demand ai& report) through the same reducer.
   const ingest = useCallback((name: string, data: unknown) => dispatch({ type: 'event', name, data, at: now() }), [])
-  return { state, start, select, setLang, ingest, isMock: MOCK }
+  return { state, start, select, setLang, ingest, paused, togglePause, isMock: MOCK }
 }

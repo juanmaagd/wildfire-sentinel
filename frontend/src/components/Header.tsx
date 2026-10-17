@@ -1,3 +1,4 @@
+import { Pause, Play } from 'lucide-react'
 import type { DayInfo, Mode, RunStatus } from '../types'
 
 interface Props {
@@ -7,19 +8,21 @@ interface Props {
   day: DayInfo | null
   onStart: (m: Mode) => void
   isMock: boolean
+  paused: boolean
+  onTogglePause: () => void
 }
 
 const LABEL: Record<Mode, string> = { live: 'Live', replay: 'Replay · Ofunato' }
 
 // Compact floating bar: brand · segmented mode control · short status.
-export default function Header({ status, statusText, mode, day, onStart, isMock }: Props) {
+export default function Header({ status, statusText, mode, day, onStart, isMock, paused, onTogglePause }: Props) {
   const running = status === 'running'
   const short =
     status === 'error'
       ? 'error'
       : status === 'idle' || !mode
         ? 'ready'
-        : `${day ? `day ${day.index}/${day.of} · ` : ''}${running ? 'live' : 'done'}`
+        : `${day ? `day ${day.index}/${day.of} · ` : ''}${paused ? 'paused' : running ? 'live' : 'done'}`
   return (
     <header className="flex items-center gap-4 bg-canvas/85 py-2 pl-2 pr-4 backdrop-blur-sm">
       <div className="flex items-center gap-2">
@@ -49,8 +52,19 @@ export default function Header({ status, statusText, mode, day, onStart, isMock 
         })}
       </nav>
 
+      {running && (
+        <button
+          type="button"
+          onClick={onTogglePause}
+          aria-label={paused ? 'Resume replay' : 'Pause replay'}
+          className={`flex size-7 items-center justify-center rounded-[3.6px] border ${paused ? 'border-lime bg-lime text-canvas' : 'border-iron text-bone hover:border-lime hover:text-lime'}`}
+        >
+          {paused ? <Play size={14} /> : <Pause size={14} />}
+        </button>
+      )}
+
       <div className="flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider text-ash" role="status" aria-live="polite" title={statusText}>
-        <span className={`size-2 rounded-full ${running ? 'animate-pulse bg-lime' : status === 'done' ? 'bg-lime/60' : 'bg-ash'}`} />
+        <span className={`size-2 rounded-full ${running && !paused ? 'animate-pulse bg-lime' : paused ? 'bg-lime' : status === 'done' ? 'bg-lime/60' : 'bg-ash'}`} />
         {short}
       </div>
     </header>

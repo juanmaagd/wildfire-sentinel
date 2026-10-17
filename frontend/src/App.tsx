@@ -13,7 +13,7 @@ import { useRun } from './useRun'
 import type { Focus, Site } from './types'
 
 export default function App() {
-  const { state, start, select, setLang, ingest, isMock } = useRun()
+  const { state, start, select, setLang, ingest, paused, togglePause, isMock } = useRun()
   const [reportLoading, setReportLoading] = useState<string | null>(null)
   const [fly, setFly] = useState<Focus | null>(null)
   const [bad, setBad] = useState<Set<string>>(() => new Set())
@@ -109,14 +109,16 @@ export default function App() {
 
         {/* Floating top-left column: product bar (no page header) + compact KPI strip. */}
         <div className="absolute left-4 top-4 flex flex-col items-start gap-2">
-  <Header
-          status={state.status}
-          statusText={state.statusText}
-          mode={state.mode}
-          day={state.day}
-          onStart={start}
-          isMock={isMock}
-        />
+          <Header
+            status={state.status}
+            statusText={state.statusText}
+            mode={state.mode}
+            day={state.day}
+            onStart={start}
+            isMock={isMock}
+            paused={paused}
+            onTogglePause={togglePause}
+          />
         <div className="bg-canvas/85 backdrop-blur-sm">
           <button
             type="button"
