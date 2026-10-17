@@ -29,9 +29,18 @@ export const verdictLabel = (v?: Verdict | string): string =>
 export const urgencyOf = (s: Site): number =>
   Math.round(s.report?.scores?.urgency ?? 0)
 
+// Japan time for display: FIRMS gives UTC acquisition date + HHMM; the app shows JST everywhere.
+const JST = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+export const toJst = (d: Date | string): string => `${JST.format(typeof d === 'string' ? new Date(d) : d)} JST`
+
+export const acqDate = (h: { acq_date?: string; acq_time?: string | number }): Date | null => {
+  if (!h.acq_date) return null
+  const t = String(h.acq_time ?? '0').padStart(4, '0')
+  return new Date(`${h.acq_date}T${t.slice(0, 2)}:${t.slice(2)}:00Z`)
+}
+
 export const fmtAcq = (s: Site): string => {
-  const h = s.hotspot
-  if (!h?.acq_date) return ''
-  const t = String(h.acq_time ?? '').padStart(4, '0').replace(/^(\d\d)(\d\d)$/, '$1:$2')
-  return `${h.acq_date} ${t} UTC`
+  const d = s.hotspot ? acqDate(s.hotspot) : null
+  return d ? toJst(d) : ''
 }

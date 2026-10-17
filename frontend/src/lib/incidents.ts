@@ -1,3 +1,4 @@
+import { acqDate, toJst } from './format'
 import type { Feature, Polygon } from 'geojson'
 import type { Site } from '../types'
 
@@ -14,7 +15,9 @@ export interface Incident {
   maxFrp: number
   center: [number, number] // lon, lat
   outline: Feature<Polygon>
-  lastDay: string
+  lastDay: string // UTC acquisition date (compared with the replay day)
+  firstSeenJst: string // 'MM-DD' in Japan time, for display
+  lastSeenJst: string // 'MM-DD HH:MM' in Japan time, for display
   active: boolean // detected on the current replay day (or the day before); false = extinguished
 }
 
@@ -94,6 +97,7 @@ export function buildIncidents(sites: Record<string, Site>, currentDay?: string)
         detections: g.reduce((a, s) => a + (s.hotspot!.detections ?? 1), 0),
         days: [...new Set(g.map((s) => s.hotspot!.acq_date).filter(Boolean) as string[])].sort(),
         lastDay: [...g.map((s) => s.hotspot!.acq_date ?? '')].sort().at(-1) ?? '',
+        ...seenJst(g),
         maxFrp: Math.max(...g.map((s) => s.hotspot!.frp ?? 0)),
         center: [lon, lat] as [number, number],
         outline: hullOutline(g.map((s) => [s.hotspot!.lon, s.hotspot!.lat] as [number, number])),
@@ -106,4 +110,10 @@ export function buildIncidents(sites: Record<string, Site>, currentDay?: string)
       const quietDays = currentDay && inc.lastDay ? (Date.parse(currentDay) - Date.parse(inc.lastDay)) / 86400000 : 0
       return { ...inc, id: `fire-${i + 1}`, n: i + 1, active: quietDays <= 1 }
     })
+}
+
+function seenJst(g: Site[]): { firstSeenJst: string; lastSeenJst: string } {
+  const times = g.map((s) => acqDate(s.hotspot!)).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime())
+  if (!times.length) return { firstSeenJst: '', lastSeenJst: '' }
+  return { firstSeenJst: toJst(times[0]).slice(5, 10), lastSeenJst: toJst(times[times.length - 1]).slice(5, 16) }
 }

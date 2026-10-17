@@ -23,7 +23,7 @@ export default function AlertsList({ incidents, selectedId, lang, onSelect }: Pr
         const r = s.report && !s.report.brief_pending ? s.report : undefined
         const title = (r && ((lang === 'ja' ? r.headline_ja : r.headline_en) || r.headline_en)) || `Fire #${inc.n}`
         const sel = inc.sites.some((x) => x.id === selectedId)
-        const days = inc.days.length > 1 ? `${inc.days.length} days` : inc.days[0] ?? ''
+        const days = inc.days.length > 1 ? `${inc.days.length} days` : inc.firstSeenJst
         return (
           <li key={inc.id}>
             <button
@@ -47,7 +47,7 @@ export default function AlertsList({ incidents, selectedId, lang, onSelect }: Pr
                   <span>{inc.detections} detections</span>
                   {days && <span>{days}</span>}
                   <span>max {inc.maxFrp.toFixed(1)} MW</span>
-                  <span className={inc.active ? 'text-lime' : 'text-ash'}>{inc.active ? 'active' : `extinguished · last seen ${inc.lastDay.slice(5)}`}</span>
+                  <span className={inc.active ? 'text-lime' : 'text-ash'}>{inc.active ? 'active' : `extinguished · last seen ${inc.lastSeenJst} JST`}</span>
                 </span>
               </span>
             </button>
