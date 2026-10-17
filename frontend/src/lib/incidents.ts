@@ -23,7 +23,37 @@ const km = (a: Site, b: Site) => {
   return Math.hypot(dx, dy)
 }
 
-function circle(lon: number, lat: number, radiusKm: number): Feature<Polygon> {
+// Tight outline: convex hull of a ~BUFFER_KM ring around every detection (rounded, follows the real shape).
+const BUFFER_KM = 0.5
+
+function hullOutline(points: [number, number][]): Feature<Polygon> {
+  const pts: [number, number][] = []
+  for (const [lon, lat] of points) {
+    const kx = 111.32 * Math.cos((lat * Math.PI) / 180)
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * 2 * Math.PI
+      pts.push([lon + (BUFFER_KM * Math.cos(a)) / kx, lat + (BUFFER_KM * Math.sin(a)) / 111.32])
+    }
+  }
+  // Andrew's monotone chain.
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const cross = (o: number[], a: number[], b: number[]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+  const lower: [number, number][] = []
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop()
+    lower.push(p)
+  }
+  const upper: [number, number][] = []
+  for (const p of [...pts].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop()
+    upper.push(p)
+  }
+  const ring = lower.slice(0, -1).concat(upper.slice(0, -1))
+  ring.push(ring[0])
+  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } }
+}
+
+export function circle(lon: number, lat: number, radiusKm: number): Feature<Polygon> {
   const pts: [number, number][] = []
   for (let i = 0; i <= 48; i++) {
     const a = (i / 48) * 2 * Math.PI
@@ -50,8 +80,6 @@ export function buildIncidents(sites: Record<string, Site>): Incident[] {
     .map((g) => {
       const lon = g.reduce((a, s) => a + s.hotspot!.lon, 0) / g.length
       const lat = g.reduce((a, s) => a + s.hotspot!.lat, 0) / g.length
-      const center = { hotspot: { lat, lon } } as Site
-      const radius = Math.max(...g.map((s) => km(center, s))) + 0.6
       const rep =
         g.find((s) => s.report && !s.report.brief_pending) ??
         g.find((s) => s.report) ??
@@ -65,7 +93,7 @@ export function buildIncidents(sites: Record<string, Site>): Incident[] {
         days: [...new Set(g.map((s) => s.hotspot!.acq_date).filter(Boolean) as string[])].sort(),
         maxFrp: Math.max(...g.map((s) => s.hotspot!.frp ?? 0)),
         center: [lon, lat] as [number, number],
-        outline: circle(lon, lat, radius),
+        outline: hullOutline(g.map((s) => [s.hotspot!.lon, s.hotspot!.lat] as [number, number])),
         first: Math.min(...g.map((s) => s.alertAt ?? 0)),
       }
     })
