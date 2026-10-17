@@ -8,12 +8,12 @@ from collections.abc import AsyncIterable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 
-from . import analyst, graph, memory, sources, spread
+from . import analyst, graph, memory, sources, spread, video
 from .config import IMAGES_DIR, ROOT
 from .pipeline import ASSESSED, HOTSPOTS, Run, report_on_demand
 
@@ -110,6 +110,36 @@ async def response_plan(lat: float, lon: float, at_hour: int = 0, day: str | Non
 async def fire_graph(lat: float, lon: float, day: str, name: str = "Fire incident") -> dict:
     """Write the incident's propagation graph to Neo4j and return it with the Cypher-computed insights."""
     return await asyncio.to_thread(graph.build, lat, lon, day, name)
+
+
+def _scenario(lat: float, lon: float, day: str | None) -> str:
+    return f"{lat:.3f},{lon:.3f},{day or 'live'}"
+
+
+@app.post("/api/video")
+async def create_video(frames: list[UploadFile] = File(...), hours: str = Form(...), areas: str = Form(...),
+                       lat: float = Form(...), lon: float = Form(...), day: str | None = Form(None),
+                       head_deg: float = Form(...), wind_ms: float = Form(...), fuel: str = Form("conifer_forest")) -> dict:
+    """On demand: MiniMax H3 (ai&) animates between consecutive keyframes rendered from our own 3D prediction."""
+    data = [await f.read() for f in frames]
+    hs, ars = [int(x) for x in hours.split(",")], [float(x) for x in areas.split(",")]
+    if len(data) < 2 or len(data) != len(hs) or len(hs) != len(ars):
+        raise HTTPException(400, "need matching frames, hours and areas (at least two keyframes)")
+    return await asyncio.to_thread(video.start, _scenario(lat, lon, day), data, hs, ars, head_deg, wind_ms, fuel)
+
+
+@app.get("/api/video/{video_id}")
+async def video_status(video_id: str) -> dict:
+    try:
+        return await asyncio.to_thread(video.poll, video_id)
+    except KeyError:
+        raise HTTPException(404, "unknown video job")
+
+
+@app.get("/api/videos")
+async def videos(lat: float, lon: float, day: str | None = None) -> list[dict]:
+    """Clips already generated for this scenario (pre-generated for the demo)."""
+    return video.listing(_scenario(lat, lon, day))
 
 
 @app.get("/api/report/{hotspot_id}")

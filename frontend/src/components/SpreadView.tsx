@@ -1,7 +1,7 @@
 import type { Feature, FeatureCollection } from 'geojson'
 import { useEffect, useRef, useState } from 'react'
 import { Map as MLMap, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl'
-import { Pause, Play, X } from 'lucide-react'
+import { Clapperboard, Pause, Play, X } from 'lucide-react'
 import { humanize } from '../lib/format'
 import WeatherTimeline, { type HourWeather } from './WeatherTimeline'
 
@@ -45,6 +45,16 @@ export interface PlanData {
   }
   brief_error?: string
 }
+interface VideoSegment { id: string; from_h: number; to_h: number; status: string; url: string | null; error: { message?: string } | null }
+interface VideoJob { id: string; hours: number[]; segments: VideoSegment[]; status: 'in_progress' | 'completed' | 'failed'; created: number }
+
+// Keyframes for the AI video: ignition, two intermediate prediction horizons and the target hour.
+function keyframes(target: number, horizons: number[]): number[] {
+  const nearest = (h: number) => horizons.reduce((a, b) => (Math.abs(b - h) < Math.abs(a - h) ? b : a))
+  const end = horizons.filter((h) => h <= target).pop() ?? horizons[0]
+  return [...new Set([0, nearest(end / 4), nearest(end / 2), end])].filter((h) => h <= end).sort((a, b) => a - b)
+}
+
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
 const compass = (deg: number) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16]
 
@@ -96,6 +106,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
   const [hour, setHour] = useState(0) // continuous timeline position (hours after the prediction start)
   const [playing, setPlaying] = useState(false)
   const dataRef = useRef<SpreadData | null>(null)
+  const capturingRef = useRef(false) // pauses the ignition pulse so the map can settle for a keyframe
   // Response plan: on demand, decided at the timeline hour the user is looking at.
   const [plans, setPlans] = useState<PlanData[]>([])
   const [active, setActive] = useState<number | null>(null)
@@ -176,6 +187,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
       pitch: 65,
       bearing: 105,
       maxPitch: 85,
+      canvasContextAttributes: { preserveDrawingBuffer: true }, // lets us capture keyframes for the AI video
     })
     mapRef.current = map
 
@@ -198,13 +210,15 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
       // Control line of the response plan (UI accent: it is an action, not fire data).
       // The line is a one-cell band: its contours are drawn as lines only (a fill would cover the whole interior).
       map.addLayer({ id: 'ctl-line', type: 'line', source: 'ctl', paint: { 'line-color': '#ebfc72', 'line-width': 3 } })
+      // Video capture only: a glowing ignition point instead of the UI markers.
+      map.addLayer({ id: 'ign-glow', type: 'circle', source: 'ign', layout: { visibility: 'none' }, paint: { 'circle-radius': 7, 'circle-color': '#ff6a1f', 'circle-blur': 0.6 } })
       readyRef.current = true
       applyData()
     })
 
     let raf = 0
     const pulse = () => {
-      if (map.getLayer('ign-pulse')) {
+      if (map.getLayer('ign-pulse') && !capturingRef.current) {
         const k = 0.5 - 0.5 * Math.cos(((performance.now() % 1600) / 1600) * Math.PI * 2)
         map.setPaintProperty('ign-pulse', 'circle-radius', 8 + 18 * k)
         map.setPaintProperty('ign-pulse', 'circle-opacity', 0.5 - 0.4 * k)
@@ -271,9 +285,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
     ;(m.getSource('ctl') as GeoJSONSource).setData(on ? plan.control_line : { type: 'FeatureCollection', features: [] })
   }, [showPlan, plan, data])
 
-  useEffect(() => {
-    const m = mapRef.current
-    if (!m || !readyRef.current) return
+  function applyHour(m: MLMap, hour: number) {
     const filter = ['<=', ['get', 'hours'], hour]
     m.setFilter('perim-fill', filter as never)
     m.setFilter('perim-line', filter as never)
@@ -283,7 +295,128 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
     m.setPaintProperty('perim-fill', 'fill-color', ['case', recent, PERIM_COLOR, '#2a1410'] as never)
     m.setPaintProperty('perim-fill', 'fill-opacity', ['case', recent, 0.38, 0.6] as never)
     m.setPaintProperty('perim-line', 'line-color', ['case', recent, PERIM_COLOR, '#5a2a1c'] as never)
+    m.setPaintProperty('perim-line', 'line-width', 2.5)
+  }
+
+  useEffect(() => {
+    const m = mapRef.current
+    if (!m || !readyRef.current) return
+    applyHour(m, hour)
   }, [hour, data])
+
+  // AI video: keyframes rendered from our own model (same camera), animated between by MiniMax H3 on ai&.
+  const [videos, setVideos] = useState<VideoJob[]>([])
+  const [videoBusy, setVideoBusy] = useState(false)
+  const [videoError, setVideoError] = useState<string | null>(null)
+  const [player, setPlayer] = useState<VideoJob | null>(null)
+  const scenarioQuery = () => {
+    const q = new URLSearchParams({ lat: String(lat), lon: String(lon) })
+    if (day) q.set('day', day)
+    return q
+  }
+
+  useEffect(() => {
+    if (forceMock) return
+    fetch(`/api/videos?${scenarioQuery()}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: VideoJob[]) => setVideos(list))
+      .catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lon, day, forceMock])
+
+  // Poll unfinished jobs (rendering takes minutes).
+  useEffect(() => {
+    const pending = videos.filter((v) => v.status === 'in_progress')
+    if (!pending.length) return
+    const t = window.setTimeout(async () => {
+      const fresh = await Promise.all(pending.map((v) => fetch(`/api/video/${v.id}`).then((r) => r.json() as Promise<VideoJob>).catch(() => v)))
+      setVideos((vs) => vs.map((v) => fresh.find((f) => f.id === v.id) ?? v))
+    }, 6000)
+    return () => window.clearTimeout(t)
+  }, [videos])
+
+  async function captureFrame(m: MLMap, h: number, front: number): Promise<Blob> {
+    // Realistic look for the video model: burned ground as a dark scar, only the current front in orange.
+    m.setFilter('perim-fill', ['<=', ['get', 'hours'], h] as never)
+    m.setFilter('perim-line', ['==', ['get', 'hours'], front] as never)
+    m.setPaintProperty('perim-fill', 'fill-color', '#1c120e')
+    m.setPaintProperty('perim-fill', 'fill-opacity', 0.82)
+    m.setPaintProperty('perim-line', 'line-color', '#ff6a1f')
+    m.setPaintProperty('perim-line', 'line-width', 3)
+    m.setLayoutProperty('ign-glow', 'visibility', h === 0 ? 'visible' : 'none')
+    await new Promise<void>((resolve) => {
+      const done = window.setTimeout(resolve, 8000) // terrain tiles may keep loading; capture anyway
+      m.once('idle', () => {
+        window.clearTimeout(done)
+        resolve()
+      })
+      m.triggerRepaint()
+    })
+    return new Promise((resolve, reject) => m.getCanvas().toBlob((b) => (b ? resolve(b) : reject(new Error('capture failed'))), 'image/png'))
+  }
+
+  const requestVideo = async () => {
+    const m = mapRef.current
+    if (!m || !data) return
+    setPlaying(false)
+    setVideoBusy(true)
+    setVideoError(null)
+    const target = Math.floor(hour) > 0 ? Math.floor(hour) : 24
+    const kf = keyframes(target, data.hours)
+    const ui = ['head-line', 'seeds', 'obs', 'ctl-line', 'ign-pulse', 'ign-dot']
+    capturingRef.current = true
+    ui.forEach((id) => m.setLayoutProperty(id, 'visibility', 'none'))
+    const camera = { center: m.getCenter(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() }
+    try {
+      // Frame the final predicted area so the fire fills the shot (same camera for every keyframe).
+      const shown = showPlan && plan ? plan.with_plan : data.perimeters
+      const end = kf[kf.length - 1]
+      const pts: [number, number][] = [[data.ignition.lon, data.ignition.lat]]
+      const walk = (c: unknown): void => {
+        if (Array.isArray(c) && typeof c[0] === 'number') pts.push([c[0] as number, c[1] as number])
+        else if (Array.isArray(c)) c.forEach(walk)
+      }
+      for (const f of shown.features) if (f.properties?.hours === end) walk((f.geometry as { coordinates: unknown }).coordinates)
+      const lons = pts.map((c) => c[0])
+      const lats = pts.map((c) => c[1])
+      m.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], {
+        padding: 160,
+        pitch: 55,
+        bearing: data.stats.head_direction_deg,
+        duration: 0,
+        maxZoom: 15,
+      })
+      const frames: Blob[] = []
+      for (const h of kf) frames.push(await captureFrame(m, h, h))
+      const areas = kf.map((h) => (h === 0 ? 0 : ((showPlan && plan ? plan.area_ha.with_plan : data.stats.area_ha)[String(h)] ?? 0)))
+      const form = new FormData()
+      frames.forEach((b, i) => form.append('frames', b, `frame${i}.png`))
+      form.set('hours', kf.join(','))
+      form.set('areas', areas.join(','))
+      form.set('lat', String(lat))
+      form.set('lon', String(lon))
+      if (day) form.set('day', day)
+      form.set('head_deg', String(data.stats.head_direction_deg))
+      form.set('wind_ms', String(data.wind?.speed_ms ?? 3))
+      if (fuel) form.set('fuel', fuel)
+      const res = await fetch('/api/video', { method: 'POST', body: form })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const job = (await res.json()) as VideoJob
+      setVideos((vs) => [...vs, job])
+    } catch (err) {
+      setVideoError((err as Error).message)
+    } finally {
+      ui.forEach((id) => m.setLayoutProperty(id, 'visibility', 'visible'))
+      m.setLayoutProperty('ign-glow', 'visibility', 'none')
+      m.jumpTo(camera)
+      applyHour(m, hour)
+      capturingRef.current = false
+      setVideoBusy(false)
+    }
+  }
+
+  const latestVideo = [...videos].reverse().find((v) => v.status === 'completed')
+  const renderingVideo = videos.find((v) => v.status === 'in_progress')
 
   // Timeline autoplay: sweep the hours (about 8 s for a week), then stop.
   const maxHour = data ? Math.max(...data.hours) : 0
@@ -397,6 +530,8 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
         </aside>
       )}
 
+      {player && <VideoPlayer job={player} onClose={() => setPlayer(null)} />}
+
       {!data && (
         <div className="absolute inset-0 flex items-center justify-center bg-canvas/80">
           <div className="flex items-center gap-4 bg-canvas/80 backdrop-blur-sm px-8 py-6 font-mono text-[13px] uppercase tracking-wider text-bone">
@@ -483,6 +618,32 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
                 </div>
               )}
               {planError && <span className="font-mono text-[12px] text-ash">plan failed: {planError}</span>}
+              <button
+                type="button"
+                onClick={requestVideo}
+                disabled={videoBusy || !!renderingVideo || forceMock}
+                className="flex items-center gap-2 rounded-[3.6px] border border-iron px-[12px] py-[7px] font-mono text-[12px] uppercase tracking-wider text-bone hover:border-lime hover:text-lime disabled:opacity-50"
+              >
+                {(videoBusy || renderingVideo) && <span className="size-3 animate-spin rounded-[50%] border-2 border-iron border-t-lime" />}
+                <Clapperboard size={14} />
+                {videoBusy
+                  ? 'Capturing…'
+                  : renderingVideo
+                    ? `Rendering ${renderingVideo.segments.filter((s) => s.url).length}/${renderingVideo.segments.length}…`
+                    : `AI video to +${keyframes(Math.floor(hour) > 0 ? Math.floor(hour) : 24, data.hours).slice(-1)[0]}h`}
+              </button>
+              {latestVideo && (
+                <button
+                  type="button"
+                  onClick={() => setPlayer(latestVideo)}
+                  className="rounded-[3.6px] bg-lime px-[12px] py-[7px] font-mono text-[12px] uppercase tracking-wider text-canvas hover:bg-olive"
+                >
+                  Watch AI video
+                </button>
+              )}
+              {(videoError || videos.some((v) => v.status === 'failed')) && (
+                <span className="font-mono text-[12px] text-ash">video failed{videoError ? `: ${videoError}` : ''}</span>
+              )}
             </div>
             <div className="ml-auto text-right">
               <div className="font-mono font-light text-[40px] leading-none text-bone">
@@ -524,6 +685,51 @@ function PlanNote({ label, text }: { label: string; text: string }) {
     <div>
       <div className="font-mono text-[11px] uppercase tracking-wider text-ash">{label}</div>
       <p className="mt-1 text-[13px] leading-snug text-bone/90">{text}</p>
+    </div>
+  )
+}
+
+function VideoPlayer({ job: full, onClose }: { job: VideoJob; onClose: () => void }) {
+  const [i, setI] = useState(0)
+  const job = { ...full, segments: full.segments.filter((s) => s.url) } // clips blocked by moderation are skipped
+  const seg = job.segments[i]
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-canvas/95 p-10">
+      <div className="flex w-full max-w-5xl items-center justify-between font-mono text-[12px] uppercase tracking-wider text-ash">
+        <span>
+          AI visualization of the simulation · hour {seg.from_h} → {seg.to_h} ({i + 1}/{job.segments.length})
+        </span>
+        <button type="button" onClick={onClose} className="flex items-center gap-2 text-bone hover:text-lime">
+          <X size={16} /> Close
+        </button>
+      </div>
+      {seg.url && (
+        <video
+          key={seg.id}
+          src={seg.url}
+          autoPlay
+          muted
+          controls
+          playsInline
+          onEnded={() => setI((n) => (n + 1 < job.segments.length ? n + 1 : 0))}
+          className="w-full max-w-5xl"
+        />
+      )}
+      <div className="flex gap-2">
+        {job.segments.map((s, n) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setI(n)}
+            className={`border px-3 py-[5px] font-mono text-[12px] uppercase tracking-wider ${n === i ? 'border-lime text-lime' : 'border-iron text-bone hover:border-bone'}`}
+          >
+            +{s.from_h}h → +{s.to_h}h
+          </button>
+        ))}
+      </div>
+      <div className="max-w-5xl text-center font-mono text-[11px] uppercase tracking-wider text-ash">
+        MiniMax H3 on ai& · every clip starts and ends on a frame rendered by our spread model (real terrain, predicted burn area); smoke and flames in between are generated
+      </div>
     </div>
   )
 }
