@@ -283,3 +283,79 @@ ul.actions li::marker { color: var(--fire); }
   .side { overflow: visible; }
   .stat-num { font-size: 28px; }
 }
+
+/* 3D spread view (MapLibre overlay) */
+.spread3d {
+  --sp-h1: #ffe14d;
+  --sp-h3: #ff8a1f;
+  --sp-h6: #b3120c;
+  position: fixed; inset: 0; z-index: 5000;
+  display: grid; grid-template-rows: auto 1fr auto;
+  background: var(--bg); color: var(--text);
+}
+.spread3d[hidden] { display: none; }
+.sp3-head {
+  display: flex; align-items: center; gap: 20px;
+  padding: 12px 22px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.sp3-titles { min-width: 0; flex: 1; }
+.sp3-kicker { font: 600 13px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--fire); }
+.sp3-titles h2 { margin: 4px 0 0; font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+.sp3-sub { margin-top: 2px; font: 13px/1.3 var(--mono); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp3-wind {
+  display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 600;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 14px; white-space: nowrap;
+}
+.sp3-arrow { display: inline-block; color: var(--calm); font-size: 20px; }
+.sp3-close, .sp3-btn {
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+  padding: 11px 18px; border-radius: var(--r); font-size: 17px; font-weight: 600; cursor: pointer;
+}
+.sp3-close:hover, .sp3-btn:hover { border-color: var(--text-3); }
+.sp3-btn[aria-pressed="true"], .sp3-step.on { border-color: var(--u2); background: oklch(0.3 0.05 60); }
+.sp3-map-wrap { position: relative; min-height: 0; }
+.sp3-map { position: absolute; inset: 0; }
+.sp3-legend {
+  position: absolute; left: 16px; bottom: 28px; z-index: 2;
+  background: oklch(0.17 0.012 250 / 0.88); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 10px 14px; font: 600 14px var(--sans); pointer-events: none;
+}
+.sp3-ramp { display: block; width: 220px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--sp-h1), var(--sp-h3), var(--sp-h6)); }
+.sp3-ramp-lbl { display: flex; justify-content: space-between; margin-top: 5px; }
+.sp3-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px;
+  padding: 12px 22px; border-top: 1px solid var(--line); background: var(--surface);
+}
+.sp3-timeline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sp3-play { min-width: 140px; }
+.sp3-steps { display: flex; gap: 8px; }
+.sp3-readout { margin-left: auto; text-align: right; }
+.sp3-area { font: 700 40px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.sp3-area small { font-size: 18px; color: var(--text-2); font-weight: 500; }
+.sp3-when { font-size: 16px; color: var(--text-2); margin-top: 4px; }
+.sp3-attrib { width: 100%; font-size: 13px; color: var(--text-3); }
+.sp3-attrib a { color: var(--text-2); }
+.sp3-ignition { position: relative; width: 22px; height: 22px; }
+.sp3-core {
+  position: absolute; inset: 4px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--fire-hot); box-shadow: 0 0 0 2px #000;
+}
+.sp3-ring {
+  position: absolute; inset: 0; border-radius: 50%; background: var(--fire);
+  animation: sp3-pulse 1.6s ease-out infinite;
+}
+@keyframes sp3-pulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(3.4); opacity: 0; } }
+.sp3-head-arrow { width: 34px; height: 34px; display: grid; place-items: center; pointer-events: none; }
+.sp3-head-arrow span { display: block; font-size: 26px; line-height: 1; color: #fff; text-shadow: 0 0 4px #000, 0 0 2px #000; }
+.btn-3d {
+  border: 1px solid var(--fire); background: oklch(0.3 0.08 35); color: var(--text);
+  padding: 8px 14px; border-radius: var(--r); font-weight: 600; font-size: 15px; cursor: pointer; white-space: nowrap;
+}
+.btn-3d-sm { padding: 4px 9px; font-size: 13px; align-self: center; margin-left: auto; }
+.detail-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+@media (max-width: 700px) {
+  .sp3-head { flex-wrap: wrap; padding: 10px 14px; }
+  .sp3-titles h2 { font-size: 22px; }
+  .sp3-foot { padding: 10px 14px; }
+  .sp3-readout { margin-left: 0; text-align: left; }
+}

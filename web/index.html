@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.2/maplibre-gl.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -64,7 +65,41 @@
   </aside>
 </main>
 
+<div id="spread3d" class="spread3d" hidden role="dialog" aria-modal="true" aria-labelledby="sp3Title">
+  <header class="sp3-head">
+    <div class="sp3-titles">
+      <div class="sp3-kicker">Predicted spread · 3D</div>
+      <h2 id="sp3Title">Predicted spread</h2>
+      <div class="sp3-sub" id="sp3Sub"></div>
+    </div>
+    <div class="sp3-wind" id="sp3Wind"></div>
+    <button type="button" class="sp3-close" id="sp3Close">Close ✕</button>
+  </header>
+  <div class="sp3-map-wrap">
+    <div id="sp3Map" class="sp3-map"></div>
+    <div class="sp3-legend" aria-hidden="true">
+      <span class="sp3-ramp"></span>
+      <span class="sp3-ramp-lbl"><b style="color:var(--sp-h1)">1 h</b><b style="color:var(--sp-h3)">3 h</b><b style="color:var(--sp-h6)">6 h</b></span>
+    </div>
+  </div>
+  <footer class="sp3-foot">
+    <div class="sp3-timeline">
+      <button type="button" class="sp3-btn sp3-play" id="sp3Play" aria-pressed="false">▶ Play</button>
+      <div class="sp3-steps" role="group" aria-label="Time step" id="sp3Steps"></div>
+    </div>
+    <div class="sp3-readout">
+      <div class="sp3-area" id="sp3Area">0 ha</div>
+      <div class="sp3-when" id="sp3When">Ignition</div>
+    </div>
+    <div class="sp3-attrib">
+      <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>
+      · Elevation: AWS Terrain Tiles · Illustrative model output, not a forecast
+    </div>
+  </footer>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.6.2/maplibre-gl.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -136,16 +136,19 @@
         <div class="alert-main">
           <div class="alert-title"${r && lang === 'ja' ? ' lang="ja"' : ''}>${esc(title)}</div>
           <div class="alert-meta"><span>${coord(s)}</span>${s.frp != null ? `<span>FRP ${num(s.frp, 1)} MW</span>` : ''}<span>${esc(step)}</span>${s.triage.source === 'memory' ? memoryBadge() : ''}</div>
-        </div></li>`;
+        </div><button type="button" class="btn-3d btn-3d-sm" data-spread3d="${esc(s.id)}" title="Open 3D spread view">3D</button></li>`;
     }).join('');
   }
   const urg = (s) => (s.report && s.report.scores && Math.round(s.report.scores.urgency)) || 0;
 
   $('alerts').addEventListener('click', (e) => {
+    const sb = e.target.closest('[data-spread3d]');
+    if (sb) { openSpread(sb.dataset.spread3d); return; }
     const li = e.target.closest('.alert');
     if (li) select(li.dataset.id, true);
   });
   $('alerts').addEventListener('keydown', (e) => {
+    if (e.target.closest('button')) return;
     const li = e.target.closest('.alert');
     if (li && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(li.dataset.id, true); }
   });
@@ -203,7 +206,7 @@
         <h3${r && lang === 'ja' ? ' lang="ja"' : ''}>${esc(headline)}</h3>
         <div class="sub">${coord(s)}${when ? ' · ' + esc(when) : ''}${s.frp != null ? ' · FRP ' + num(s.frp, 1) + ' MW' : ''}${s.detections != null ? ' · ' + esc(s.detections) + ' detections' : ''}</div>
       </div>
-      ${r ? `<div class="lang-toggle" role="group" aria-label="Brief language"><button type="button" data-lang="ja" aria-pressed="${lang === 'ja'}">JA</button><button type="button" data-lang="en" aria-pressed="${lang === 'en'}">EN</button></div>` : ''}
+      <div class="detail-actions">${t && t.verdict === 'possible_fire' ? `<button type="button" class="btn-3d" data-spread3d="${esc(s.id)}">3D view</button>` : ''}${r ? `<div class="lang-toggle" role="group" aria-label="Brief language"><button type="button" data-lang="ja" aria-pressed="${lang === 'ja'}">JA</button><button type="button" data-lang="en" aria-pressed="${lang === 'en'}">EN</button></div>` : ''}</div>
     </div>`);
     if (r) {
       const brief = lang === 'ja' ? r.brief_ja : r.brief_en;
@@ -273,6 +276,8 @@
   }
 
   $('detail').addEventListener('click', (e) => {
+    const sb = e.target.closest('[data-spread3d]');
+    if (sb) { openSpread(sb.dataset.spread3d); return; }
     const b = e.target.closest('[data-lang]');
     if (!b) return;
     lang = b.dataset.lang;
@@ -280,6 +285,263 @@
     renderDetail();
     renderAlerts();
   });
+
+  // ---------- 3D spread view (MapLibre GL, terrain + GSI photo) ----------
+  const SP_COLORS = { 1: '#ffe14d', 3: '#ff8a1f', 6: '#b3120c' };
+  const SP_FILL = { 1: 0.6, 3: 0.45, 6: 0.36 };
+  const SP_STEP_MS = 1200;
+  const SP_CAM_ZOOM = 13.5;
+  const SP_CAM_PITCH = 65;
+  const SP_BEARING_OFFSET = 0; // camera bearing = head direction + offset (fire runs away from the viewer)
+  const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const compass = (deg) => COMPASS[Math.round((((Number(deg) || 0) % 360) + 360) % 360 / 22.5) % 16];
+  const fmtHa = (v) => (Math.round(v * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  const sp = { open: false, map: null, mapReady: null, token: 0, data: null, source: null, step: 0, timer: null, marker: null, arrow: null, shownArea: 0, areaRaf: 0 };
+
+  function spHours(data) {
+    return [...new Set((data.perimeters.features || []).map((f) => f.properties.hours))].sort((a, b) => a - b);
+  }
+  const spArea = (data, h) => {
+    const v = data.stats && data.stats.area_ha && data.stats.area_ha[String(h)];
+    if (typeof v === 'number') return v;
+    const f = data.perimeters.features.find((x) => x.properties.hours === h);
+    return f ? f.properties.area_ha : 0;
+  };
+
+  async function fetchSpread(s) {
+    if (!MOCK) {
+      try {
+        const q = new URLSearchParams({ lat: String(s.lat), lon: String(s.lon) });
+        if (s.acq_date) q.set('day', s.acq_date);
+        const res = await fetch(`${API}/api/spread?${q}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return { data: await res.json(), source: 'api' };
+      } catch (err) {
+        feed(`Spread model unavailable (${err.message}), showing sample`, 'err');
+      }
+    }
+    const res = await fetch('mock-spread.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('sample HTTP ' + res.status);
+    return { data: await res.json(), source: 'sample' };
+  }
+
+  function ensureSpreadMap(lon, lat) {
+    if (sp.map) return sp.mapReady;
+    sp.map = new maplibregl.Map({
+      container: 'sp3Map',
+      center: [lon, lat], zoom: SP_CAM_ZOOM, pitch: SP_CAM_PITCH, bearing: 0, maxPitch: 85,
+      style: {
+        version: 8,
+        sources: {
+          photo: {
+            type: 'raster', tileSize: 256, maxzoom: 18,
+            tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+            attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>',
+          },
+          dem: {
+            type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 15,
+            tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+            attribution: 'Elevation: AWS Terrain Tiles',
+          },
+        },
+        // GSI has no photo tiles over the sea (404): a sea-colored background avoids black patches.
+        layers: [{ id: 'sea', type: 'background', paint: { 'background-color': '#0b2a3a' } },
+                 { id: 'photo', type: 'raster', source: 'photo' }],
+      },
+    });
+    sp.mapReady = new Promise((resolve) => {
+      sp.map.once('load', () => {
+        sp.map.setTerrain({ source: 'dem', exaggeration: 1.5 });
+        resolve();
+      });
+    });
+    return sp.mapReady;
+  }
+
+  function clearSpread() {
+    const map = sp.map;
+    if (!map) return;
+    spHours(sp.data || { perimeters: { features: [] } }).forEach((h) => {
+      [`sp-${h}-line`, `sp-${h}-fill`].forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
+      if (map.getSource(`sp-${h}`)) map.removeSource(`sp-${h}`);
+    });
+    ['sp-head-line'].forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
+    if (map.getSource('sp-head')) map.removeSource('sp-head');
+    if (sp.marker) { sp.marker.remove(); sp.marker = null; }
+    if (sp.arrow) { sp.arrow.remove(); sp.arrow = null; }
+  }
+
+  function applySpread(data, s) {
+    const map = sp.map;
+    clearSpread();
+    sp.data = data;
+    const ig = data.ignition || s;
+    const heading = (data.stats || {}).head_direction_deg;
+    const head = data.head_path.geometry.coordinates;
+    const tip = head[head.length - 1];
+
+    // Perimeters: largest hour first so the 1 h layer sits on top.
+    const feats = data.perimeters.features.slice().sort((a, b) => b.properties.hours - a.properties.hours);
+    feats.forEach((f) => {
+      const h = f.properties.hours;
+      const id = `sp-${h}`;
+      map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: [f] } });
+      map.addLayer({ id: `${id}-fill`, type: 'fill', source: id,
+        paint: { 'fill-color': SP_COLORS[h] || '#ff8a1f', 'fill-opacity': 0, 'fill-opacity-transition': { duration: SP_STEP_MS } } });
+      map.addLayer({ id: `${id}-line`, type: 'line', source: id,
+        paint: { 'line-color': SP_COLORS[h] || '#ff8a1f', 'line-width': 2.5, 'line-opacity': 0, 'line-opacity-transition': { duration: SP_STEP_MS } } });
+    });
+    map.addSource('sp-head', { type: 'geojson', data: data.head_path });
+    map.addLayer({ id: 'sp-head-line', type: 'line', source: 'sp-head',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': 3.5, 'line-dasharray': [1.2, 1] } });
+
+    // Ignition marker (pulsing) and head-direction arrow at the tip.
+    const igEl = document.createElement('div');
+    igEl.className = 'sp3-ignition';
+    igEl.innerHTML = '<span class="sp3-ring"></span><span class="sp3-core"></span>';
+    sp.marker = new maplibregl.Marker({ element: igEl }).setLngLat([ig.lon, ig.lat]).addTo(map);
+    const arEl = document.createElement('div');
+    arEl.className = 'sp3-head-arrow';
+    arEl.innerHTML = '<span style="transform:rotate(' + (Number(heading) || 0) + 'deg)">▲</span>';
+    sp.arrow = new maplibregl.Marker({ element: arEl, anchor: 'center' }).setLngLat(tip).addTo(map);
+
+    // Camera: look along the head so the fire runs away from the viewer.
+    const camLon = ig.lon + 0.35 * (tip[0] - ig.lon);
+    const camLat = ig.lat + 0.35 * (tip[1] - ig.lat);
+    map.flyTo({ center: [camLon, camLat], zoom: SP_CAM_ZOOM, pitch: SP_CAM_PITCH,
+      bearing: (Number(heading) || 0) + SP_BEARING_OFFSET, duration: 2600, essential: true });
+
+    buildSteps(spHours(data));
+    showStep(sp.step > 0 && sp.step <= spHours(data).length ? sp.step : 0, true);
+  }
+
+  function buildSteps(hours) {
+    $('sp3Steps').innerHTML = hours.map((h, i) =>
+      `<button type="button" class="sp3-btn sp3-step" data-step="${i + 1}" aria-pressed="false">+${h} h</button>`).join('');
+  }
+
+  function setLayerPaint(id, prop, v) {
+    if (sp.map && sp.map.getLayer(id)) sp.map.setPaintProperty(id, prop, v);
+  }
+
+  function tweenArea(to) {
+    cancelAnimationFrame(sp.areaRaf);
+    const from = sp.shownArea;
+    const t0 = performance.now();
+    const frame = (now) => {
+      const t = Math.min(1, (now - t0) / SP_STEP_MS);
+      const e = 1 - Math.pow(1 - t, 3);
+      sp.shownArea = from + (to - from) * e;
+      $('sp3Area').innerHTML = `${fmtHa(sp.shownArea)}<small> ha</small>`;
+      if (t < 1) sp.areaRaf = requestAnimationFrame(frame);
+    };
+    sp.areaRaf = requestAnimationFrame(frame);
+  }
+
+  function showStep(k, immediate) {
+    if (!sp.data) return;
+    const hours = spHours(sp.data);
+    sp.step = Math.max(0, Math.min(k, hours.length));
+    hours.forEach((h, i) => {
+      const on = i < sp.step;
+      setLayerPaint(`sp-${h}-fill`, 'fill-opacity', on ? SP_FILL[h] || 0.4 : 0);
+      setLayerPaint(`sp-${h}-line`, 'line-opacity', on ? 1 : 0);
+    });
+    document.querySelectorAll('.sp3-step').forEach((b) => {
+      const on = Number(b.dataset.step) === sp.step;
+      b.setAttribute('aria-pressed', String(on));
+      b.classList.toggle('on', on);
+    });
+    const target = sp.step ? spArea(sp.data, hours[sp.step - 1]) : 0;
+    $('sp3When').textContent = sp.step ? `Predicted spread at +${hours[sp.step - 1]} h` : 'Ignition';
+    if (immediate) { cancelAnimationFrame(sp.areaRaf); sp.shownArea = target; $('sp3Area').innerHTML = `${fmtHa(target)}<small> ha</small>`; }
+    else tweenArea(target);
+    setPlayLabel(!!sp.timer);
+  }
+
+  function setPlayLabel(playing) {
+    const n = sp.data ? spHours(sp.data).length : 0;
+    const btn = $('sp3Play');
+    btn.textContent = playing ? '❚❚ Pause' : (n && sp.step >= n ? '↺ Replay' : '▶ Play');
+    btn.setAttribute('aria-pressed', String(playing));
+  }
+
+  function stopPlay() {
+    if (sp.timer) clearInterval(sp.timer);
+    sp.timer = null;
+    setPlayLabel(false);
+  }
+
+  function play() {
+    stopPlay();
+    const n = spHours(sp.data).length;
+    if (sp.step >= n) showStep(0);
+    const next = () => {
+      showStep(sp.step + 1);
+      if (sp.step >= n) stopPlay();
+    };
+    next();
+    if (sp.step < n) { sp.timer = setInterval(next, SP_STEP_MS); setPlayLabel(true); }
+  }
+
+  function renderSpreadHeader(data, s, source) {
+    const ig = data.ignition || s;
+    const w = data.wind || {};
+    const heading = (data.stats || {}).head_direction_deg;
+    $('sp3Sub').textContent = `${coord(ig)} · max spread ${num((data.stats || {}).max_ros_m_min, 1)} m/min · head ${heading}° ${compass(heading)}`
+      + (source === 'sample' ? ' · sample data (model offline)' : (data.model ? ' · ' + data.model : ''));
+    $('sp3Wind').innerHTML = `<span class="sp3-arrow" style="transform:rotate(${((Number(w.from_deg) || 0) + 180) % 360}deg)" aria-hidden="true">➤</span>
+      <span>Wind ${num(w.speed_ms, 1)} m/s from ${compass(w.from_deg)} (${esc(w.from_deg)}°), gusts ${num(w.gust_ms, 1)} m/s</span>`;
+  }
+
+  async function openSpread(id) {
+    const s = sites.get(id);
+    if (!s || typeof s.lat !== 'number') return;
+    const token = ++sp.token;
+    stopPlay();
+    sp.open = true;
+    $('spread3d').hidden = false;
+    $('sp3Sub').textContent = `${coord(s)} · running spread model…`;
+    try {
+      const { data, source } = await fetchSpread(s);
+      if (token !== sp.token) return;
+      sp.source = source;
+      const ig = data.ignition || s;
+      ensureSpreadMap(ig.lon, ig.lat);
+      sp.map.resize();
+      renderSpreadHeader(data, s, source);
+      await sp.mapReady;
+      if (token !== sp.token) return;
+      sp.step = 0;
+      sp.shownArea = 0;
+      applySpread(data, s);
+      sp.map.resize();
+    } catch (err) {
+      if (token !== sp.token) return;
+      $('sp3Sub').textContent = `Could not load spread data: ${err.message}`;
+      feed(`3D spread failed: ${err.message}`, 'err');
+    }
+  }
+
+  function closeSpread() {
+    if (!sp.open) return;
+    sp.open = false;
+    sp.token += 1;
+    stopPlay();
+    $('spread3d').hidden = true;
+  }
+
+  $('sp3Close').addEventListener('click', closeSpread);
+  $('sp3Play').addEventListener('click', () => (sp.timer ? stopPlay() : play()));
+  $('sp3Steps').addEventListener('click', (e) => {
+    const b = e.target.closest('.sp3-step');
+    if (!b) return;
+    stopPlay();
+    showStep(Number(b.dataset.step));
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sp.open) closeSpread(); });
 
   // ---------- Event handlers (shared by SSE and mock) ----------
   const handlers = {
@@ -373,6 +635,7 @@
   }
 
   function reset() {
+    closeSpread();
     runToken += 1;
     if (stream) { stream.close(); stream = null; }
     stopTimer();
