@@ -13,9 +13,11 @@ export interface SpreadData {
   stats: { area_ha: Record<string, number>; max_ros_m_min?: number; head_direction_deg: number }
   model?: string
   elapsed_ms?: number
+  seeds?: FeatureCollection // burning points at t=0 (first satellite pass)
+  observed?: FeatureCollection // what the satellite actually saw afterwards (properties.hours_after)
+  observed_hits?: Record<string, [number, number]> // per horizon: [inside prediction, total]
+  start?: string
 }
-
-const STEPS = [0, 1, 3, 6]
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
 const compass = (deg: number) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16]
 
@@ -43,15 +45,8 @@ const STYLE: StyleSpecification = {
   ],
 }
 
-const PERIM_COLOR = ['match', ['get', 'hours'], 1, '#ffd000', 3, '#ff8a1f', 6, '#b71c1c', '#ffd000'] as const
+const PERIM_COLOR = ['interpolate', ['linear'], ['get', 'hours'], 1, '#ffd000', 6, '#ffb000', 12, '#ff8a1f', 24, '#e0461f', 48, '#8b1010'] as const
 
-// Offset a point by km along a compass bearing.
-function offset(lat: number, lon: number, bearingDeg: number, km: number): [number, number] {
-  const r = (bearingDeg * Math.PI) / 180
-  const dLat = (Math.cos(r) * km) / 111.32
-  const dLon = (Math.sin(r) * km) / (111.32 * Math.cos((lat * Math.PI) / 180))
-  return [lon + dLon, lat + dLat]
-}
 
 interface Props {
   lat: number
@@ -67,6 +62,7 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
   const mapRef = useRef<MLMap | null>(null)
   const readyRef = useRef(false)
   const [data, setData] = useState<SpreadData | null>(null)
+  const steps = [0, ...(data?.hours ?? [1, 3, 6])]
   const [source, setSource] = useState<'api' | 'demo' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState(0)
@@ -129,11 +125,16 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
       map.addSource('perim', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('head', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('ign', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addSource('seeds', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addSource('obs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({ id: 'perim-fill', type: 'fill', source: 'perim', filter: ['<=', ['get', 'hours'], 0], paint: { 'fill-color': PERIM_COLOR as never, 'fill-opacity': 0.35 } })
       map.addLayer({ id: 'perim-line', type: 'line', source: 'perim', filter: ['<=', ['get', 'hours'], 0], paint: { 'line-color': PERIM_COLOR as never, 'line-width': 2.5 } })
       map.addLayer({ id: 'head-line', type: 'line', source: 'head', paint: { 'line-color': '#ffd000', 'line-width': 3 } })
       map.addLayer({ id: 'ign-pulse', type: 'circle', source: 'ign', paint: { 'circle-radius': 14, 'circle-color': '#ff3b1f', 'circle-opacity': 0.4 } })
       map.addLayer({ id: 'ign-dot', type: 'circle', source: 'ign', paint: { 'circle-radius': 6, 'circle-color': '#ffffff', 'circle-stroke-color': '#ff3b1f', 'circle-stroke-width': 3 } })
+      // Prediction vs reality: burning at t=0 (orange) and later satellite detections (white) revealed with the timeline.
+      map.addLayer({ id: 'seeds', type: 'circle', source: 'seeds', paint: { 'circle-radius': 4, 'circle-color': '#ff8a1f', 'circle-stroke-color': '#13140e', 'circle-stroke-width': 1 } })
+      map.addLayer({ id: 'obs', type: 'circle', source: 'obs', filter: ['<=', ['get', 'hours_after'], -1], paint: { 'circle-radius': 5, 'circle-color': '#f4f3e8', 'circle-stroke-color': '#13140e', 'circle-stroke-width': 1.5 } })
       readyRef.current = true
       applyData()
     })
@@ -165,14 +166,31 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
     if (!m || !d || !readyRef.current) return
     ;(m.getSource('perim') as GeoJSONSource).setData(d.perimeters)
     ;(m.getSource('head') as GeoJSONSource).setData({ type: 'FeatureCollection', features: [d.head_path] })
+    ;(m.getSource('seeds') as GeoJSONSource).setData(d.seeds ?? { type: 'FeatureCollection', features: [] })
+    ;(m.getSource('obs') as GeoJSONSource).setData(d.observed ?? { type: 'FeatureCollection', features: [] })
     ;(m.getSource('ign') as GeoJSONSource).setData({
       type: 'FeatureCollection',
       features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [d.ignition.lon, d.ignition.lat] } }],
     })
-    // Camera: behind the ignition, looking along the head direction.
+    // Camera: frame the whole predicted area (largest horizon) plus real detections, clear of the panels.
     const head = d.stats.head_direction_deg
-    const [cLon, cLat] = offset(d.ignition.lat, d.ignition.lon, head, 1.2)
-    m.jumpTo({ center: [cLon, cLat], zoom: 14, pitch: 65, bearing: head })
+    const coords: [number, number][] = [[d.ignition.lon, d.ignition.lat]]
+    const walk = (c: unknown): void => {
+      if (Array.isArray(c) && typeof c[0] === 'number') coords.push([c[0] as number, c[1] as number])
+      else if (Array.isArray(c)) c.forEach(walk)
+    }
+    const maxH = Math.max(...d.hours)
+    for (const f of d.perimeters.features) if (f.properties?.hours === maxH) walk((f.geometry as { coordinates: unknown }).coordinates)
+    for (const f of d.observed?.features ?? []) walk((f.geometry as { coordinates: unknown }).coordinates)
+    const lons = coords.map((c) => c[0])
+    const lats = coords.map((c) => c[1])
+    m.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], {
+      padding: { top: 240, bottom: 260, left: 80, right: 80 },
+      pitch: 55,
+      bearing: head,
+      duration: 0,
+      maxZoom: 14.5,
+    })
   }
 
   useEffect(() => {
@@ -184,15 +202,16 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
   useEffect(() => {
     const m = mapRef.current
     if (!m || !readyRef.current) return
-    const filter = ['<=', ['get', 'hours'], STEPS[step]]
+    const filter = ['<=', ['get', 'hours'], steps[step]]
     m.setFilter('perim-fill', filter as never)
     m.setFilter('perim-line', filter as never)
+    m.setFilter('obs', ['<=', ['get', 'hours_after'], step > 0 ? steps[step] : -1] as never)
   }, [step, data])
 
   // Timeline autoplay: advance through the steps, then stop.
   useEffect(() => {
     if (!playing) return
-    if (step >= STEPS.length - 1) {
+    if (step >= steps.length - 1) {
       setPlaying(false)
       return
     }
@@ -200,7 +219,8 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
     return () => window.clearTimeout(t)
   }, [playing, step])
 
-  const area = data && step > 0 ? data.stats.area_ha[String(STEPS[step])] : 0
+  const hits = data?.observed_hits?.[String(steps[step])]
+  const area = data && step > 0 ? data.stats.area_ha[String(steps[step])] : 0
   const wind = data?.wind
 
   return (
@@ -212,7 +232,15 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-6">
         <div className="pointer-events-auto bg-canvas/80 backdrop-blur-sm px-5 py-4">
           <div className="font-sans font-normal text-[72px] leading-[0.95] tracking-[-0.03em] text-bone">Predicted spread</div>
-          <div className="mt-1 font-mono text-[13px] uppercase tracking-wider text-ash">3D spread prediction</div>
+          <div className="mt-1 font-mono text-[13px] uppercase tracking-wider text-ash">
+            3D spread prediction{data?.start ? ` · from satellite pass ${data.start}` : ''}
+          </div>
+          {data?.observed && (
+            <div className="mt-2 flex gap-4 font-mono text-[12px] uppercase tracking-wider text-ash">
+              <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-[#ff8a1f]" />burning at start</span>
+              <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-bone" />real detections later</span>
+            </div>
+          )}
           {wind && (
             <div className="mt-3 font-mono text-[13px] uppercase tracking-wider tabular-nums text-lime">
               Wind {wind.speed_ms.toFixed(1)} m/s from {compass(wind.from_deg)} · gusts {wind.gust_ms.toFixed(1)}
@@ -243,7 +271,7 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
             <button
               type="button"
               onClick={() => {
-                if (!playing && step >= STEPS.length - 1) setStep(0)
+                if (!playing && step >= steps.length - 1) setStep(0)
                 setPlaying((p) => !p)
               }}
               className="flex size-12 items-center justify-center rounded-[3.6px] bg-lime text-canvas hover:bg-olive"
@@ -252,7 +280,7 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
               {playing ? <Pause size={22} /> : <Play size={22} />}
             </button>
             <div className="flex gap-2">
-              {STEPS.map((h, i) => (
+              {steps.map((h, i) => (
                 <button
                   key={h}
                   type="button"
@@ -272,6 +300,11 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
               <div className="font-mono font-light text-[56px] text-bone">
                 {area ? area.toFixed(1) : '0.0'} <span className="font-mono text-lg text-ash">ha</span>
               </div>
+              {hits && hits[1] > 0 && (
+                <div className="font-mono text-[13px] uppercase tracking-wider text-lime">
+                  Satellite check · {hits[0]}/{hits[1]} real detections inside ({Math.round((100 * hits[0]) / hits[1])}%)
+                </div>
+              )}
               <div className="font-mono text-xs uppercase text-ash">
                 {source === 'demo' ? 'Demo model' : data.model ? humanize(data.model) : 'Model output'}
                 {data.elapsed_ms ? ` · ${Math.round(data.elapsed_ms)} ms` : ''}

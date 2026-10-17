@@ -1,7 +1,8 @@
 """Fire spread prediction: elliptical wind-driven rate of spread + slope, minimum travel time on a terrain grid.
 
-Terrain: AWS Terrain Tiles (terrarium), z12 3x3 mosaic (~23 km), downsampled to ~90 m cells. Sea (elev <= 0) doesn't burn.
-Output: perimeters at +1/+3/+6 h as GeoJSON, head path, burned area.
+Terrain: AWS Terrain Tiles (terrarium), z11 3x3 mosaic (~45 km), downsampled to ~180 m cells. Sea (elev <= 0) doesn't burn.
+Weather varies hour by hour (Open-Meteo hourly): wind direction/speed and humidity change the spread as time passes.
+Output: perimeters at +3/+6/+12/+24/+48 h as GeoJSON, head path, burned area.
 """
 
 import heapq
@@ -17,8 +18,10 @@ from skimage import measure
 from . import scoring
 
 TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
-ZOOM, TILES, DOWNSAMPLE = 12, 3, 3
-HOURS = (1, 3, 6)
+ZOOM, TILES, DOWNSAMPLE = 11, 3, 3
+HOURS = (3, 6, 12, 24, 48)
+SPEED = 0.35  # calibrated on the Ofunato replay (area vs. observed detections)
+VIIRS_TOLERANCE_CELLS = 2  # ~375 m VIIRS pixel ≈ 2 grid cells
 EARTH = 40075016.686
 
 
@@ -53,7 +56,20 @@ def _dem(lat: float, lon: float) -> tuple[np.ndarray, float, float, float]:
     return grid, cell_m, tx0 * 256.0, ty0 * 256.0
 
 
-def simulate(lat: float, lon: float, weather: dict, fuel_type: str = "conifer_forest") -> dict:
+def _hour_params(w: dict, fuel: float, rain_7d: float) -> tuple[float, float, float, float]:
+    """(head ROS m/min, wind-to east, wind-to north, ellipse eccentricity) for one hour of weather."""
+    dryness = 0.5 * min(1, max(0, (70 - w["humidity_pct"]) / 45)) + 0.5 * min(1, max(0, (15 - rain_7d) / 15))
+    wind = w["wind_speed_ms"]
+    r_head = (1.0 + 6.0 * fuel * dryness) * (1 + 0.3 * wind)
+    to = math.radians((w["wind_from_deg"] + 180) % 360)
+    mph = wind * 2.237
+    lb = min(3.5, max(1.0, 0.936 * math.exp(0.2566 * mph) + 0.461 * math.exp(-0.1548 * mph) - 0.397))
+    return r_head, math.sin(to), math.cos(to), math.sqrt(lb * lb - 1) / lb
+
+
+def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str = "conifer_forest",
+             seeds: list[tuple[float, float]] | None = None, observed: dict | None = None, speed: float = SPEED) -> dict:
+    """`seeds`: every burning point seen at t=0 (multi-point ignition); defaults to the alert location."""
     started = time.perf_counter()
     dem, cell_m, ox, oy = _dem(lat, lon)
     H, W = dem.shape
@@ -61,29 +77,29 @@ def simulate(lat: float, lon: float, weather: dict, fuel_type: str = "conifer_fo
     ign = (int((py - oy) / DOWNSAMPLE), int((px - ox) / DOWNSAMPLE))
 
     fuel = scoring.FUEL.get(fuel_type, 0.7)
-    dryness = 0.5 * min(1, max(0, (70 - weather["humidity_pct"]) / 45)) + 0.5 * min(1, max(0, (15 - weather["rain_7d_mm"]) / 15))
-    wind = weather["wind_speed_ms"]
-
-    gy, gx = np.gradient(dem, cell_m)
-    to = math.radians((weather["wind_from_deg"] + 180) % 360)
-    we, wn = math.sin(to), math.cos(to)
-    # Base ROS (m/min) from fuel and dryness, wind multiplier, slope: ~doubles per 10° upslope along the wind.
-    r0 = 1.0 + 6.0 * fuel * dryness
-    r_head = r0 * (1 + 0.3 * wind)
-    lb = max(1.0, 0.936 * math.exp(0.2566 * wind * 2.237) + 0.461 * math.exp(-0.1548 * wind * 2.237) - 0.397)
-    lb = min(lb, 3.5)
-    ecc = math.sqrt(lb * lb - 1) / lb
+    params = [_hour_params(w, fuel, rain_7d) for w in hourly] or [_hour_params(
+        {"humidity_pct": 50, "wind_speed_ms": 3, "wind_from_deg": 270}, fuel, rain_7d)]
+    params = [(p[0] * speed, *p[1:]) for p in params]
 
     burnable = dem > 0.5
     T = np.full((H, W), np.inf)
-    T[ign] = 0.0
+    starts = {ign}
+    for s_lat, s_lon in seeds or []:
+        sx, sy = _merc_px(s_lat, s_lon, ZOOM)
+        cell = (int((sy - oy) / DOWNSAMPLE), int((sx - ox) / DOWNSAMPLE))
+        if 0 <= cell[0] < H and 0 <= cell[1] < W:
+            starts.add(cell)
+    pq = []
+    for cell in starts:
+        T[cell] = 0.0
+        pq.append((0.0, *cell))
     horizon = 60 * max(HOURS) + 1
-    pq = [(0.0, *ign)]
     moves = [(dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0)]
     while pq:
         t, r, c = heapq.heappop(pq)
         if t > T[r, c] or t > horizon:
             continue
+        r_head, we, wn, ecc = params[min(int(t // 60), len(params) - 1)]  # weather at the fire's current time
         for dr, dc in moves:
             rr, cc = r + dr, c + dc
             if not (0 <= rr < H and 0 <= cc < W) or not burnable[rr, cc]:
@@ -98,40 +114,92 @@ def simulate(lat: float, lon: float, weather: dict, fuel_type: str = "conifer_fo
             if nt < T[rr, cc]:
                 T[rr, cc] = nt
                 heapq.heappush(pq, (nt, rr, cc))
+    w0 = hourly[0] if hourly else {"wind_from_deg": 270, "wind_speed_ms": 3, "wind_gust_ms": 5}
+    we, wn = params[0][1], params[0][2]
 
     def to_lonlat(r: float, c: float) -> list[float]:
         lo, la = _px_to_lonlat(ox + (c + 0.5) * DOWNSAMPLE, oy + (r + 0.5) * DOWNSAMPLE, ZOOM)
         return [round(float(lo), 5), round(float(la), 5)]
 
     features, areas, head = [], {}, [to_lonlat(*ign)]
+    seed_points = [to_lonlat(*c) for c in starts]
     cell_ha = cell_m * cell_m / 1e4
     for h in HOURS:
         burned = T <= 60 * h
         areas[str(h)] = round(float(burned.sum()) * cell_ha, 1)
-        contours = measure.find_contours(np.pad(burned.astype(float), 1), 0.5)
+        contours = [c for c in measure.find_contours(np.pad(burned.astype(float), 1), 0.5) if len(c) >= 4]
         if not contours:
             continue
-        ring = [to_lonlat(r - 1, c - 1) for r, c in max(contours, key=len)]
-        ring.append(ring[0])
+        polys = []
+        for contour in contours:  # several fronts can burn separately (multi-point ignition)
+            ring = [to_lonlat(r - 1, c - 1) for r, c in contour]
+            ring.append(ring[0])
+            polys.append([ring])
         features.append({"type": "Feature", "properties": {"hours": h, "area_ha": areas[str(h)]},
-                         "geometry": {"type": "Polygon", "coordinates": [ring]}})
-    for h in range(1, max(HOURS) + 1):
+                         "geometry": {"type": "MultiPolygon", "coordinates": polys}})
+    for h in range(1, max(HOURS) + 1, 2):
         rows, cols = np.nonzero(T <= 60 * h)
         if len(rows):
             proj = (cols - ign[1]) * we + (ign[0] - rows) * wn
             i = int(np.argmax(proj))
             head.append(to_lonlat(rows[i], cols[i]))
 
+    # Prediction vs reality: was each later satellite detection inside the predicted burn area by then?
+    hits = {}
+    if observed:
+        k = VIIRS_TOLERANCE_CELLS
+        for h in HOURS:
+            pts = [f for f in observed["features"] if f["properties"]["hours_after"] <= h]
+            hit = 0
+            for f in pts:
+                o_lon, o_lat = f["geometry"]["coordinates"]
+                sx, sy = _merc_px(o_lat, o_lon, ZOOM)
+                r, c = int((sy - oy) / DOWNSAMPLE), int((sx - ox) / DOWNSAMPLE)
+                window = T[max(0, r - k): r + k + 1, max(0, c - k): c + k + 1]
+                hit += bool(window.size and window.min() <= 60 * h)
+            hits[str(h)] = [hit, len(pts)]
+
     return {
         "ignition": {"lat": lat, "lon": lon},
-        "wind": {"from_deg": weather["wind_from_deg"], "speed_ms": wind, "gust_ms": weather["wind_gust_ms"]},
-        "weather": weather,
+        "observed_hits": hits,
+        "seeds": {"type": "FeatureCollection", "features": [
+            {"type": "Feature", "properties": {}, "geometry": {"type": "Point", "coordinates": c}} for c in seed_points]},
+        "wind": {"from_deg": w0["wind_from_deg"], "speed_ms": w0["wind_speed_ms"], "gust_ms": w0.get("wind_gust_ms")},
+        "weather_hourly": hourly[: max(HOURS) + 1],
         "hours": list(HOURS),
         "perimeters": {"type": "FeatureCollection", "features": features},
         "head_path": {"type": "Feature", "properties": {}, "geometry": {"type": "LineString", "coordinates": head}},
-        "stats": {"area_ha": areas, "max_ros_m_min": round(r_head * 2, 1),
-                  "head_direction_deg": round((weather["wind_from_deg"] + 180) % 360), "cell_m": round(cell_m),
-                  "fuel": fuel_type, "dryness": round(dryness, 2), "length_to_breadth": round(lb, 2)},
-        "model": "elliptical wind-slope spread, minimum travel time on terrain grid",
+        "stats": {"area_ha": areas, "max_ros_m_min": round(max(p[0] for p in params) * 2, 1),
+                  "head_direction_deg": round((w0["wind_from_deg"] + 180) % 360), "cell_m": round(cell_m),
+                  "fuel": fuel_type, "weather_hours": len(hourly)},
+        "model": "elliptical wind-slope spread with hourly weather, minimum travel time on terrain grid",
         "elapsed_ms": int((time.perf_counter() - started) * 1000),
+    }
+
+
+def replay_context(lat: float, lon: float, day: str, span: float = 0.2) -> dict:
+    """What the satellite saw: the first pass on `day` (seeds, t=0) and every later detection within 48 h."""
+    from datetime import datetime, timedelta, timezone
+
+    from .sources import fetch_hotspots
+
+    rows = fetch_hotspots((lon - span, lat - span, lon + span, lat + span), 3, on_date=day)
+    for r in rows:
+        r["when"] = datetime.strptime(f"{r['acq_date']} {int(r['acq_time']):04d}", "%Y-%m-%d %H%M").replace(tzinfo=timezone.utc)
+    if not rows:
+        return {"seeds": [], "start_jst": None, "observed": {"type": "FeatureCollection", "features": []}}
+    t0 = min(r["when"] for r in rows)
+    first_pass = [r for r in rows if (r["when"] - t0).total_seconds() < 3600]
+    feats = []
+    for r in rows:
+        hours_after = (r["when"] - t0).total_seconds() / 3600
+        if 1 <= hours_after <= max(HOURS):
+            feats.append({"type": "Feature", "properties": {"hours_after": round(hours_after, 1), "frp": float(r["frp"])},
+                          "geometry": {"type": "Point", "coordinates": [float(r["longitude"]), float(r["latitude"])]}})
+    jst = t0.astimezone(timezone(timedelta(hours=9)))
+    return {
+        "seeds": [(float(r["latitude"]), float(r["longitude"])) for r in first_pass],
+        "start_jst": jst.strftime("%Y-%m-%dT%H:00"),
+        "start_label": jst.strftime("%Y-%m-%d %H:%M JST"),
+        "observed": {"type": "FeatureCollection", "features": feats},
     }

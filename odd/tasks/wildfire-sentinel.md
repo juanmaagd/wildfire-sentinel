@@ -27,6 +27,7 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 | T7 | S6 | Map UI (`web/`) against the event contract below | delegated (parallel unit, disjoint surface `web/`) | done (worker; verified mock + real backend) | 3f1efac |
 | T8 | — | README, submission text, rehearsal, backup recording | delegated (Haiku) + inline | README+pitch done, rehearsal/recording todo | 50f9324 |
 | T9 | S8 | Spread model `spread.py` + `GET /api/spread?lat=&lon=&day=&fuel=` | inline | done (Ofunato d1: 16/140/421 ha at +1/3/6 h, ~2.8 s) | 75c5311 |
+| T11 | S8 | 48 h spread: hourly weather, 45 km grid, multi-point ignition from first satellite pass, prediction vs reality | inline | done (Ofunato: 2,928 ha at +48 h, 43/55 = 78% of real detections inside) | pending |
 | T10 | S8 | 3D view in UI (MapLibre) + React rebuild | delegated (Haiku, small units) | done (fallback web/ + frontend/) | 5752c8d, bbeb2c8 |
 
 ## Event contract (SSE, `GET /api/run?mode=live|replay`)
@@ -47,3 +48,4 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 - **L4** (user, verbatim): "cabe aclarar que no haremos muchos tests, los minimos posibles, neceistamos velocidad de ejecucion sin enredarnos esto no debe ser escalable, buscamos velocidad de accion"
 - **L5** Verified end to end: Ofunato replay 48 hotspots, 37 Jev calls, 3-4 ai& reports in ~23 s; UI renders alerts, report JA/EN. Fixes: Neo4j deadlock (serialized memory writes), embedding warmup at startup, reports in background, text model for reports (5-11 s vs 20-47 s vision), replay forgets Ofunato area first.
 - **L6** (user, verbatim): "si somos capaces de generar una simulacion didactica y prediccion basandonos en el clima, terreno, etc, seria espectacular, podemos emplear alguna libreria threejs o no se cual ... debemos investigarlo antes de hacer cualquier cosa"; later: "tenemos que vender humo nadie nos a juzgar ni retarnos". Research in docs/research/14a-c; MapLibre terrain prototype verified (web/terrain-test.html).
+- **L7** (user): "Por que en las predicciones solo hay hasta 6 horas? es una limitacion de los datos?" → not a data limit; extended to +3/+6/+12/+24/+48 h with hourly Open-Meteo weather, ~45 km grid, seeds = first satellite pass, speed calibrated (0.35) against Ofunato replay: +12 h 8/18, +24 h 13/32, +48 h 43/55 real detections inside the predicted area.

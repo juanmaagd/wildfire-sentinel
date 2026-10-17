@@ -61,8 +61,17 @@ async def run(mode: str = "live") -> AsyncIterable[ServerSentEvent]:
 
 @app.get("/api/spread")
 async def spread_prediction(lat: float, lon: float, day: str | None = None, fuel: str = "conifer_forest") -> dict:
-    wx = await asyncio.to_thread(sources.weather, lat, lon, day)
-    return await asyncio.to_thread(spread.simulate, lat, lon, wx, fuel)
+    # Replay: start from everything the satellite saw on its first pass, and overlay what it saw afterwards.
+    ctx = await asyncio.to_thread(spread.replay_context, lat, lon, day) if day else {}
+    wx, hourly = await asyncio.gather(
+        asyncio.to_thread(sources.weather, lat, lon, day),
+        asyncio.to_thread(sources.hourly_weather, lat, lon, day, 48, ctx.get("start_jst")),
+    )
+    result = await asyncio.to_thread(spread.simulate, lat, lon, hourly, wx["rain_7d_mm"], fuel, ctx.get("seeds"), ctx.get("observed"))
+    if ctx:
+        result["observed"] = ctx["observed"]
+        result["start"] = ctx.get("start_label")
+    return result
 
 
 @app.get("/api/report/{hotspot_id}")

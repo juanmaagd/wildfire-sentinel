@@ -84,6 +84,18 @@ export default function App() {
     }
   }
 
+  // 3D prediction for an incident starts from its first day, so the later real detections can be compared.
+  const spreadFrom = useMemo(() => {
+    if (!selected?.hotspot) return undefined
+    const inc = incidents.find((i) => i.sites.some((s) => s.id === selected.id))
+    if (!inc) return { lat: selected.hotspot.lat, lon: selected.hotspot.lon, day: selected.hotspot.acq_date }
+    const firstDay = inc.days[0]
+    const first = [...inc.sites]
+      .filter((s) => s.hotspot?.acq_date === firstDay)
+      .sort((x, y) => (y.hotspot!.frp ?? 0) - (x.hotspot!.frp ?? 0))[0]
+    return { lat: first.hotspot!.lat, lon: first.hotspot!.lon, day: firstDay }
+  }, [selected, incidents])
+
   const fuel = selected?.probe?.answers?.fuel_type as { value?: unknown } | undefined
   const fuelValue = typeof fuel?.value === 'string' ? fuel.value : undefined
 
@@ -221,12 +233,12 @@ export default function App() {
         </div>
       </main>
 
-      {spreadOpen && selected?.hotspot && (
+      {spreadOpen && spreadFrom && selected && (
         <SpreadView
           key={selected.id}
-          lat={selected.hotspot.lat}
-          lon={selected.hotspot.lon}
-          day={selected.hotspot.acq_date}
+          lat={spreadFrom.lat}
+          lon={spreadFrom.lon}
+          day={spreadFrom.day}
           fuel={fuelValue}
           forceMock={isMock}
           onClose={() => setSpreadOpen(false)}

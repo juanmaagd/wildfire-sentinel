@@ -162,3 +162,27 @@ def weather(lat: float, lon: float, day: str | None = None) -> dict:
 
 def today() -> str:
     return datetime.now().date().isoformat()
+
+
+def hourly_weather(lat: float, lon: float, day: str | None, hours: int = 48, start: str | None = None) -> list[dict]:
+    """Hourly wind/humidity for the spread model. Replay: archive from `start` (JST "YYYY-MM-DDTHH:00", default
+    14:00 on `day`). Live: forecast from now."""
+    params = {"latitude": lat, "longitude": lon, "timezone": "Asia/Tokyo", "wind_speed_unit": "ms",
+              "hourly": "relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m"}
+    if day:
+        start = date.fromisoformat(day)
+        resp = httpx.get("https://archive-api.open-meteo.com/v1/archive", timeout=30, params={
+            **params, "start_date": day, "end_date": (start + timedelta(days=hours // 24 + 1)).isoformat()})
+        first = start or f"{day}T14:00"
+    else:
+        resp = httpx.get("https://api.open-meteo.com/v1/forecast", timeout=30, params={**params, "forecast_days": hours // 24 + 2})
+        first = datetime.now().strftime("%Y-%m-%dT%H:00")
+    resp.raise_for_status()
+    h = resp.json()["hourly"]
+    i0 = h["time"].index(first) if first in h["time"] else 0
+    return [
+        {"time": h["time"][i], "humidity_pct": h["relative_humidity_2m"][i], "wind_speed_ms": h["wind_speed_10m"][i],
+         "wind_from_deg": h["wind_direction_10m"][i], "wind_gust_ms": h["wind_gusts_10m"][i]}
+        for i in range(i0, min(i0 + hours + 1, len(h["time"])))
+        if h["wind_speed_10m"][i] is not None
+    ]
