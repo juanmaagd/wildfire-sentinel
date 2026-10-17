@@ -16,6 +16,8 @@ import type { Focus, Site } from './types'
 export default function App() {
   const { state, start, select, setLang, ingest, paused, togglePause, isMock } = useRun()
   const [reportLoading, setReportLoading] = useState<string | null>(null)
+  // Deep probe on demand: the run only analyses the strongest alert per batch automatically.
+  const [probeState, setProbeState] = useState<Record<string, string>>({})
   const [fly, setFly] = useState<Focus | null>(null)
   const [bad, setBad] = useState<Set<string>>(() => new Set())
   const [spreadOpen, setSpreadOpen] = useState(false)
@@ -69,6 +71,20 @@ export default function App() {
     const h = sites[id]?.hotspot
     if (h) setFly({ lat: h.lat, lon: h.lon, zoom: 13, nonce: Date.now() })
   }
+
+  useEffect(() => {
+    if (!selected || isMock || selected.probe || selected.triage?.verdict !== 'possible_fire' || probeState[selected.id]) return
+    const id = selected.id
+    setProbeState((s) => ({ ...s, [id]: 'loading' }))
+    fetch(`/api/probe/${encodeURIComponent(id)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((d) => {
+        ingest('probe', d.probe)
+        ingest('report', d.report)
+        setProbeState((s) => ({ ...s, [id]: 'done' }))
+      })
+      .catch((err: Error) => setProbeState((s) => ({ ...s, [id]: `error: ${err.message}` })))
+  }, [selected, isMock, probeState, ingest])
 
   // ai& report on demand: only for the alert a user opens.
   const requestReport = async (id: string) => {
@@ -207,6 +223,8 @@ export default function App() {
                 onOpenGraph={replay ? () => setGraphOpen(true) : undefined}
                 onRequestReport={() => requestReport(selected.id)}
                 reportLoading={reportLoading === selected.id}
+                probeState={probeState[selected.id]}
+                onRetryProbe={() => setProbeState(({ [selected.id]: _, ...rest }) => rest)}
               />
             </div>
           </aside>

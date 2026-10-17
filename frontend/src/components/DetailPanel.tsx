@@ -14,6 +14,8 @@ interface Props {
   onOpenGraph?: () => void
   onRequestReport: () => void
   reportLoading: boolean
+  probeState?: string // 'loading' | 'done' | 'error: …'
+  onRetryProbe?: () => void
 }
 
 const Section = ({ title, right, children }: { title: ReactNode; right?: ReactNode; children: ReactNode }) => (
@@ -89,7 +91,7 @@ const SCORE_ITEMS: [keyof Report['scores'], string][] = [
   ['exposure', 'Exposure'],
 ]
 
-export default function DetailPanel({ site, lang, setLang, badImages, onBadImage, onOpen3D, onOpenGraph, onRequestReport, reportLoading }: Props) {
+export default function DetailPanel({ site, lang, setLang, badImages, onBadImage, onOpen3D, onOpenGraph, onRequestReport, reportLoading, probeState, onRetryProbe }: Props) {
   const [viewer, setViewer] = useState<number | null>(null)
   if (!site) {
     return (
@@ -259,7 +261,19 @@ export default function DetailPanel({ site, lang, setLang, badImages, onBadImage
           </div>
         </Section>
       ) : t?.verdict === 'possible_fire' ? (
-        <p className="font-mono text-[13px] text-ash">Deep probe running…</p>
+        probeState?.startsWith('error') ? (
+          <p className="font-mono text-[13px] text-ash">
+            Deep probe failed ({probeState.slice(7)}).{' '}
+            <button type="button" onClick={onRetryProbe} className="text-lime underline">
+              Retry
+            </button>
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 font-mono text-[13px] text-ash">
+            <span className="size-3 animate-spin rounded-[50%] border-2 border-iron border-t-lime" />
+            Jev deep probe running (3 images, ~10 questions)…
+          </p>
+        )
       ) : null}
 
       {r?.weather && Object.keys(r.weather).length > 0 && (

@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import analyst, graph, memory, sources, spread, video
 from .config import IMAGES_DIR, OFUNATO_BBOX, OFUNATO_OFFICIAL, ROOT
-from .pipeline import ASSESSED, HOTSPOTS, Run, report_on_demand
+from .pipeline import ASSESSED, HOTSPOTS, Run, probe_on_demand, report_on_demand
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # embedding model is cached locally; don't hit the HF Hub per run
 
@@ -158,6 +158,13 @@ async def video_status(video_id: str) -> dict:
 async def videos(lat: float, lon: float, day: str | None = None) -> list[dict]:
     """Clips already generated for this scenario (pre-generated for the demo)."""
     return video.listing(_scenario(lat, lon, day))
+
+
+@app.get("/api/probe/{hotspot_id}")
+async def probe(hotspot_id: str) -> dict:
+    if hotspot_id not in HOTSPOTS:
+        raise HTTPException(404, "unknown hotspot (run live or replay first)")
+    return await probe_on_demand(hotspot_id)
 
 
 @app.get("/api/report/{hotspot_id}")

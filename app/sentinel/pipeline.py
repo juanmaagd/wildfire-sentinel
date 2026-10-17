@@ -67,14 +67,24 @@ async def assess(h: sources.Hotspot, mem, jv, day: str | None, detections: int) 
     return probe_event, assessment
 
 
-async def report_on_demand(hotspot_id: str) -> dict:
-    """ai& situation report for one alert, only when a user asks for it."""
+async def _ensure_assessed(hotspot_id: str) -> dict:
     if hotspot_id not in ASSESSED:
         h = HOTSPOTS[hotspot_id]
         day = None if hotspot_id.startswith("drill_") or h.acq_date == sources.today() else h.acq_date
         async with memory.client() as mem, jev.client() as jv:
             await assess(h, mem, jv, day, h.detections)
-    cached = ASSESSED[hotspot_id]
+    return ASSESSED[hotspot_id]
+
+
+async def probe_on_demand(hotspot_id: str) -> dict:
+    """Jev deep probe + rule scores for an alert the run did not analyse (only the strongest per batch is automatic)."""
+    cached = await _ensure_assessed(hotspot_id)
+    return {"probe": cached["probe"], "report": cached["assessment"]}
+
+
+async def report_on_demand(hotspot_id: str) -> dict:
+    """ai& situation report for one alert, only when a user asks for it."""
+    cached = await _ensure_assessed(hotspot_id)
     rep, model, rep_ms = await analyst.report(cached["facts"], cached["wide"])
     report = {**cached["assessment"], **rep, "brief_pending": False, "model": model, "latency_ms": rep_ms,
               "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
