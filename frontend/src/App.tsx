@@ -7,7 +7,8 @@ import AlertsList from './components/AlertsList'
 import DetailPanel from './components/DetailPanel'
 import Feed from './components/Feed'
 import SpreadView from './components/SpreadView'
-import { urgencyOf } from './lib/format'
+import { buildIncidents } from './lib/incidents'
+import type { VerdictFilter } from './components/HotspotMap'
 import { useRun } from './useRun'
 import type { Focus, Site } from './types'
 
@@ -35,21 +36,18 @@ export default function App() {
   }, [isMock, start])
 
   const sites = state.sites
-  const alerts = useMemo(
-    () =>
-      Object.values(sites)
-        .filter((s) => s.triage?.verdict === 'possible_fire')
-        .sort((a, b) => urgencyOf(b) - urgencyOf(a) || (a.alertAt ?? 0) - (b.alertAt ?? 0)),
-    [sites],
-  )
+  // Detections within 2 km are one fire: the UI counts and lists incidents, not satellite pixels.
+  const incidents = useMemo(() => buildIncidents(sites), [sites])
+  const alerts = incidents
+  const [filter, setFilter] = useState<VerdictFilter>('all')
   const selected: Site | undefined = state.selectedId ? sites[state.selectedId] : undefined
 
   // Show a one-line notice for each newly raised alert (newest by alert time), auto-hide after 8 s.
   const seen = useRef(0)
   useEffect(() => {
     if (alerts.length > seen.current) {
-      const newest = [...alerts].sort((a, b) => (b.alertAt ?? 0) - (a.alertAt ?? 0))[0]
-      if (newest) setToastId(newest.id)
+      const newest = alerts[alerts.length - 1]
+      if (newest) setToastId(newest.rep.id)
     }
     seen.current = alerts.length
   }, [alerts])
@@ -95,7 +93,7 @@ export default function App() {
 
       <main className="relative min-h-0 flex-1">
         {/* The map is the protagonist: full-bleed, everything else floats over it and can be collapsed. */}
-        <HotspotMap sites={sites} selectedId={state.selectedId} fly={fly} onSelect={(id) => pickFromList(id)} />
+        <HotspotMap sites={sites} incidents={incidents} filter={filter} selectedId={state.selectedId} fly={fly} onSelect={(id) => pickFromList(id)} />
 
         {/* Floating top-left column: product bar (no page header) + compact KPI strip. */}
         <div className="absolute left-4 top-4 flex flex-col items-start gap-2">
@@ -116,7 +114,7 @@ export default function App() {
           >
             <Stat label="Hotspots" value={state.stats.total} />
             <Stat label="Filtered" value={state.stats.industrial} />
-            <Stat label="Alerts" value={alerts.length} accent />
+            <Stat label="Fires" value={alerts.length} accent />
             <ChevronDown className={`size-4 text-ash transition-transform ${kpisOpen ? 'rotate-180' : ''}`} />
           </button>
           {kpisOpen && (
@@ -136,7 +134,7 @@ export default function App() {
           >
             <span className="size-2 animate-pulse rounded-full bg-[#ff3b1f]" />
             <span className="text-lime">Alert</span>
-            <span>possible fire · {toast.hotspot ? `${toast.hotspot.lat.toFixed(3)}, ${toast.hotspot.lon.toFixed(3)}` : ''}</span>
+            <span>new fire #{alerts.length} · {toast.hotspot ? `${toast.hotspot.lat.toFixed(3)}, ${toast.hotspot.lon.toFixed(3)}` : ''}</span>
             <span className="text-ash">open →</span>
           </button>
         )}
@@ -148,7 +146,7 @@ export default function App() {
             onClick={() => setAlertsOpen((v) => !v)}
             className={`rounded-[3.6px] border px-[14px] py-[10px] font-mono text-[13px] uppercase tracking-wider backdrop-blur-sm ${alertsOpen ? 'border-lime bg-canvas/90 text-lime' : 'border-iron bg-canvas/85 text-bone hover:border-bone'}`}
           >
-            Alerts {alerts.length > 0 && <span className="ml-2 rounded-[3.6px] bg-lime px-[6px] text-canvas">{alerts.length}</span>}
+            Fires {alerts.length > 0 && <span className="ml-2 rounded-[3.6px] bg-lime px-[6px] text-canvas">{alerts.length}</span>}
           </button>
           <button
             type="button"
@@ -163,11 +161,11 @@ export default function App() {
         {alertsOpen && !selected && (
           <aside className="absolute bottom-4 right-4 top-[72px] flex w-[420px] flex-col border border-iron bg-canvas/95 backdrop-blur-sm">
             <div className="flex items-center justify-between border-b border-iron px-4 py-3 font-mono text-[13px] uppercase tracking-wider text-ash">
-              <span>Alerts · {alerts.length}</span>
+              <span>Fires · {alerts.length}</span>
               <button type="button" onClick={() => setAlertsOpen(false)} aria-label="Close alerts"><X className="size-4" /></button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <AlertsList alerts={alerts} selectedId={state.selectedId} lang={state.lang} onSelect={pickFromList} />
+              <AlertsList incidents={incidents} selectedId={state.selectedId} lang={state.lang} onSelect={pickFromList} />
             </div>
           </aside>
         )}
@@ -201,12 +199,25 @@ export default function App() {
           </div>
         )}
 
-        {/* Legend (bottom-left), small. */}
-        <div className="pointer-events-none absolute bottom-4 left-4 flex gap-4 bg-canvas/80 px-3 py-[6px] font-mono text-[12px] text-ash backdrop-blur-sm">
-          <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-[#ff3b1f]" />fire</span>
-          <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-ash" />industrial</span>
-          <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-iron" />water/other</span>
-          <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full border border-lime" />memory</span>
+        {/* Verdict filter + legend (bottom-left). */}
+        <div className="absolute bottom-4 left-4 flex items-center gap-3 bg-canvas/85 px-2 py-[6px] font-mono text-[12px] uppercase tracking-wider backdrop-blur-sm">
+          <div className="flex border border-iron" role="group" aria-label="Show">
+            {([['all', 'All'], ['fires', 'Fires'], ['nonfire', 'Non-fire']] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={filter === k}
+                onClick={() => setFilter(k)}
+                className={`px-3 py-[4px] ${filter === k ? 'bg-lime text-canvas' : 'text-bone hover:text-lime'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full bg-[#ff3b1f]" />fire</span>
+          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full bg-ash" />industrial</span>
+          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full bg-iron" />water/other</span>
+          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full border border-lime" />memory</span>
         </div>
       </main>
 

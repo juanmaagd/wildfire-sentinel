@@ -5,7 +5,7 @@ export default function Kpis({ stats, alerts }: { stats: Stats; alerts: number }
     ['Hotspots', stats.total, 'text-bone', false],
     ['Industrial filtered', stats.industrial, 'text-ash', false],
     ['Memory hits', stats.memory, 'text-bone', false],
-    ['Alerts', alerts, 'text-lime', alerts > 0],
+    ['Fires', alerts, 'text-lime', alerts > 0],
     ['Jev calls', stats.jev, 'text-bone', false],
     ['Elapsed (s)', stats.elapsed.toFixed(1), 'text-bone', false],
   ]

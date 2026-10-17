@@ -1,28 +1,31 @@
-import { siteCoord, urgencyOf } from '../lib/format'
-import type { Lang, Site } from '../types'
+import { urgencyOf } from '../lib/format'
+import type { Incident } from '../lib/incidents'
+import type { Lang } from '../types'
 
 // Urgency is shown as lime fill or outline, not red: the accent carries severity.
 const URGENCY_BG = ['', 'border border-iron text-ash', 'border border-iron text-ash', 'border border-lime text-lime', 'bg-lime text-canvas', 'bg-lime text-canvas']
 
 interface Props {
-  alerts: Site[]
+  incidents: Incident[]
   selectedId: string | null
   lang: Lang
   onSelect: (id: string) => void
 }
 
-export default function AlertsList({ alerts, selectedId, lang, onSelect }: Props) {
-  if (!alerts.length) return <p className="px-4 py-6 text-base text-ash">No alerts yet.</p>
+// One row per fire incident (grouped detections), not per satellite pixel.
+export default function AlertsList({ incidents, selectedId, lang, onSelect }: Props) {
+  if (!incidents.length) return <p className="px-4 py-6 text-base text-ash">No fires detected.</p>
   return (
-    <ul role="listbox" aria-label="Alerts" className="divide-y divide-iron">
-      {alerts.map((s) => {
+    <ul role="listbox" aria-label="Fire incidents" className="divide-y divide-iron">
+      {incidents.map((inc) => {
+        const s = inc.rep
         const u = urgencyOf(s)
-        const r = s.report
-        const title = r ? (lang === 'ja' ? r.headline_ja : r.headline_en) || r.headline_en || 'Possible fire' : 'Possible fire'
-        const step = r ? `urgency ${u}/5` : s.probe ? 'writing report…' : 'probing…'
-        const sel = s.id === selectedId
+        const r = s.report && !s.report.brief_pending ? s.report : undefined
+        const title = (r && ((lang === 'ja' ? r.headline_ja : r.headline_en) || r.headline_en)) || `Fire #${inc.n}`
+        const sel = inc.sites.some((x) => x.id === selectedId)
+        const days = inc.days.length > 1 ? `${inc.days.length} days` : inc.days[0] ?? ''
         return (
-          <li key={s.id}>
+          <li key={inc.id}>
             <button
               type="button"
               role="option"
@@ -35,15 +38,15 @@ export default function AlertsList({ alerts, selectedId, lang, onSelect }: Props
                   {u}
                 </span>
               ) : (
-                <span className="mt-0.5 flex h-9 shrink-0 items-center rounded-[3.6px] bg-iron px-2 font-mono text-xs text-ash">NEW</span>
+                <span className="mt-0.5 flex h-7 shrink-0 items-center rounded-[3.6px] bg-iron px-2 font-mono text-xs text-ash">NEW</span>
               )}
               <span className="min-w-0 flex-1">
                 <span className={`block truncate text-lg font-normal ${r && lang === 'ja' ? 'font-jp' : ''}`}>{title}</span>
                 <span className="mt-0.5 flex flex-wrap gap-x-3 font-mono text-sm text-ash">
-                  <span>{siteCoord(s)}</span>
-                  {s.hotspot?.frp != null && <span>FRP {s.hotspot.frp.toFixed(1)} MW</span>}
-                  <span>{step}</span>
-                  {s.triage?.source === 'memory' && <span className="text-lime">memory</span>}
+                  <span>{inc.center[1].toFixed(3)}, {inc.center[0].toFixed(3)}</span>
+                  <span>{inc.detections} detections</span>
+                  {days && <span>{days}</span>}
+                  <span>max {inc.maxFrp.toFixed(1)} MW</span>
                 </span>
               </span>
             </button>

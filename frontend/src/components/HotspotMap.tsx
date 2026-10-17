@@ -2,6 +2,9 @@ import type { Feature, FeatureCollection } from 'geojson'
 import { useEffect, useRef } from 'react'
 import { Map as MLMap, type GeoJSONSource, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl'
 import type { Focus, Site } from '../types'
+import type { Incident } from '../lib/incidents'
+
+export type VerdictFilter = 'all' | 'fires' | 'nonfire'
 
 const BASE: StyleSpecification = {
   version: 8,
@@ -35,6 +38,8 @@ const EMPTY = { type: 'FeatureCollection' as const, features: [] as Feature[] }
 
 export function toGeoJSON(sites: Record<string, Site>): FeatureCollection {
   const features: Feature[] = []
+  const dates = Object.values(sites).map((s) => s.hotspot?.acq_date).filter(Boolean) as string[]
+  const latest = dates.length ? Date.parse([...dates].sort().at(-1)!) : 0
   for (const s of Object.values(sites)) {
     const h = s.hotspot
     if (!h) continue
@@ -44,6 +49,7 @@ export function toGeoJSON(sites: Record<string, Site>): FeatureCollection {
         id: s.id,
         verdict: s.triage?.verdict ?? 'pending',
         memory: s.triage?.source === 'memory' ? 1 : 0,
+        age: h.acq_date && latest ? Math.round((latest - Date.parse(h.acq_date)) / 86400000) : 0,
       },
       geometry: { type: 'Point', coordinates: [h.lon, h.lat] },
     })
@@ -53,18 +59,38 @@ export function toGeoJSON(sites: Record<string, Site>): FeatureCollection {
 
 interface Props {
   sites: Record<string, Site>
+  incidents: Incident[]
+  filter: VerdictFilter
   selectedId: string | null
   fly: Focus | null
   onSelect: (id: string) => void
 }
 
-export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) {
+const incidentGeo = (incidents: Incident[]): FeatureCollection => ({
+  type: 'FeatureCollection',
+  features: incidents.map((i) => ({ ...i.outline, properties: { rep: i.rep.id, n: i.n } })),
+})
+const incidentCenters = (incidents: Incident[]): FeatureCollection => ({
+  type: 'FeatureCollection',
+  features: incidents.map((i) => ({ type: 'Feature', properties: { rep: i.rep.id }, geometry: { type: 'Point', coordinates: i.center } })),
+})
+const DOT_FILTER = {
+  all: null,
+  fires: ['==', ['get', 'verdict'], 'possible_fire'],
+  nonfire: ['!=', ['get', 'verdict'], 'possible_fire'],
+} as const
+
+export default function HotspotMap({ sites, incidents, filter, selectedId, fly, onSelect }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const loaded = useRef(false)
   const geo = toGeoJSON(sites)
   const geoRef = useRef(geo)
   geoRef.current = geo
+  const incRef = useRef(incidents)
+  incRef.current = incidents
+  const filterRef = useRef(filter)
+  filterRef.current = filter
   const selRef = useRef(selectedId)
   selRef.current = selectedId
   const onSelectRef = useRef(onSelect)
@@ -74,7 +100,13 @@ export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) 
     const m = mapRef.current
     if (!m || !loaded.current) return
     ;(m.getSource('hot') as GeoJSONSource | undefined)?.setData(geoRef.current)
+    ;(m.getSource('inc') as GeoJSONSource | undefined)?.setData(incidentGeo(incRef.current))
+    ;(m.getSource('inc-c') as GeoJSONSource | undefined)?.setData(incidentCenters(incRef.current))
     m.setFilter('hot-selected', ['==', ['get', 'id'], selRef.current ?? ''])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    m.setFilter('hot-dots', DOT_FILTER[filterRef.current] as any)
+    const showFires = filterRef.current !== 'nonfire' ? 'visible' : 'none'
+    for (const l of ['inc-fill', 'inc-line', 'fire-halo']) m.setLayoutProperty(l, 'visibility', showFires)
   }
 
   useEffect(() => {
@@ -90,11 +122,15 @@ export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) 
 
     map.on('load', () => {
       map.addSource('hot', { type: 'geojson', data: EMPTY })
+      map.addSource('inc', { type: 'geojson', data: EMPTY })
+      map.addSource('inc-c', { type: 'geojson', data: EMPTY })
+      // One fire incident = one translucent area + one pulse, instead of dozens of red dots.
+      map.addLayer({ id: 'inc-fill', type: 'fill', source: 'inc', paint: { 'fill-color': '#ff3b1f', 'fill-opacity': 0.16 } })
+      map.addLayer({ id: 'inc-line', type: 'line', source: 'inc', paint: { 'line-color': '#ff3b1f', 'line-width': 1.5, 'line-opacity': 0.8 } })
       map.addLayer({
         id: 'fire-halo',
         type: 'circle',
-        source: 'hot',
-        filter: ['==', ['get', 'verdict'], 'possible_fire'],
+        source: 'inc-c',
         paint: { 'circle-radius': 16, 'circle-color': '#ff3b1f', 'circle-opacity': 0.35 },
       })
       map.addLayer({
@@ -102,7 +138,10 @@ export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) 
         type: 'circle',
         source: 'hot',
         paint: {
-          'circle-radius': ['case', ['==', ['get', 'verdict'], 'possible_fire'], 8, 5],
+          'circle-radius': ['case', ['==', ['get', 'verdict'], 'possible_fire'], 4, 4.5],
+          // Older detections fade so today's activity stands out.
+          'circle-opacity': ['max', 0.3, ['-', 1, ['*', 0.25, ['get', 'age']]]],
+          'circle-stroke-opacity': ['max', 0.3, ['-', 1, ['*', 0.25, ['get', 'age']]]],
           'circle-color': [
             'match', ['get', 'verdict'],
             'possible_fire', '#ff3b1f',
@@ -130,9 +169,15 @@ export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) 
       const id = e.features?.[0]?.properties?.id
       if (id != null) onSelectRef.current(String(id))
     }
+    const pickIncident = (e: MapLayerMouseEvent) => {
+      if (map.queryRenderedFeatures(e.point, { layers: ['hot-dots'] }).length) return // a dot click wins
+      const rep = e.features?.[0]?.properties?.rep
+      if (rep != null) onSelectRef.current(String(rep))
+    }
     map.on('click', 'hot-dots', pick)
-    map.on('click', 'fire-halo', pick)
-    for (const layer of ['hot-dots', 'fire-halo']) {
+    map.on('click', 'inc-fill', pickIncident)
+    map.on('click', 'fire-halo', pickIncident)
+    for (const layer of ['hot-dots', 'fire-halo', 'inc-fill']) {
       map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'))
       map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''))
     }
@@ -162,7 +207,7 @@ export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) 
     pushData()
     // pushData reads refs; re-run whenever the data or selection changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geo, selectedId])
+  }, [geo, incidents, filter, selectedId])
 
   useEffect(() => {
     const m = mapRef.current
