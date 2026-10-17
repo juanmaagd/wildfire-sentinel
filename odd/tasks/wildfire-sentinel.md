@@ -1,0 +1,43 @@
+# Wildfire Sentinel — feature document
+
+Objective: hackathon product (deadline 16:00 JST, 2026-10-17). Jev raises wildfire alerts immediately from FIRMS hotspots + GSI aerial photos, fans out a deep probe on alerts, code scores, ai& writes the situation report, Neo4j Agent Memory remembers sites and verdicts. Map UI with live + replay modes.
+Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runner: `uv run pytest` (in `app/`) · Design: `docs/12-product-design.md`.
+
+## Specs
+
+- **S1** Immediate alert: "lo que me importa es que se alerte inmediato de un incendio o posible foco sabes, no apalancamos de jev que es extremadamente rapido y economico". Stage 1 = one Jev request per hotspot; a possible fire is emitted to the UI as soon as its verdict exists.
+- **S2** Deep probe: "luego si detectamos un posible foco podemos hacer mas llamadas para diferentes puntos de analisis asi es como funciona jev". Stage 2 = Jev fan-out (several images, many questions) only for alerted hotspots.
+- **S3** Situation report: "jev lanza la alerta y luego con aiand analizamos en detalle que es lo que ocurre y generamos un informe de la situacion, con diferentes parametros, urgencia, peligrosidad, no se cosas como esa y un brief". ai& report with urgency, danger, spread risk, exposure, confidence, evidence, unknowns, brief JA/EN. Numbers and times come from code, never the model.
+- **S4** Memory: Neo4j Agent Memory stores sites, verdicts as reasoning traces, detection history; known industrial sites skip Jev.
+- **S5** Demo modes: live (today's FIRMS) and replay (Ofunato, 2025-02-26 → 2025-03-01, FIRMS archive).
+- **S6** Map UI: single page, hotspots appear live colored by verdict; click → photos, probe answers, scores, memory trace, report.
+- **S7** Recommended actions are rule-based in code (assumption: evacuation advice only if houses are within reach and danger ≥ 4).
+
+## Tasks
+
+| ID | Specs | Task | Route | Status | Commit |
+| --- | --- | --- | --- | --- | --- |
+| T1 | S1,S5 | Sources: FIRMS (live + archive), GSI mosaics (z16, z14), Open-Meteo weather, satellite tile | inline | todo | |
+| T2 | S1,S4 | Stage 1 sentinel (Jev) + memory filter | inline | todo | |
+| T3 | S2 | Stage 2 deep probe (Jev fan-out), validated on Ofunato replay | inline | todo | |
+| T4 | S3,S7 | Composite scoring + action rules (pure, tested) | inline | todo | |
+| T5 | S3 | ai& analyst report (strict JSON) | inline | todo | |
+| T6 | S1,S5 | Pipeline + FastAPI SSE (`/api/run?mode=live|replay`) | inline | todo | |
+| T7 | S6 | Map UI (`web/`) against the event contract below | delegated (parallel unit, disjoint surface `web/`) | todo | |
+| T8 | — | README, submission text, rehearsal, backup recording | inline | todo | |
+
+## Event contract (SSE, `GET /api/run?mode=live|replay`)
+
+- `hotspot` `{id, lat, lon, frp, acq_date, acq_time, detections}`
+- `triage` `{id, verdict: possible_fire|industrial|water|other, source: jev|memory, confidence, signals: {industrial_nearby, vegetation_nearby, houses_nearby}, latency_ms, image_url}`
+- `probe` `{id, answers: {<question_id>: {value, confidence|probability}}, latency_ms, images: {close, wide, satellite}}`
+- `report` `{id, scores: {danger, spread_risk, exposure, urgency}, confidence, headline_ja, headline_en, brief_ja, brief_en, key_evidence[], unknowns[], recommended_actions[], weather: {...}, generated_at}`
+- `summary` `{mode, total, in_japan, filtered_industrial, memory_hits, alerts, jev_calls, elapsed_s}`
+- `done` `{}`
+- Images: `GET /api/images/{name}`.
+
+## Log
+
+- **L1** (2026-10-17, user, verbatim): "Si está bien por ahora, lo que me importa es que se alerte inmediato de un incendio o posible foco sabes, no apalancamos de jev que es extremadamente rapido y economico, luego si detectamos un posible foco podemos hacer mas llamadas para diferentes puntos de analisis asi es como funciona jev sabes lo que quiero decir"
+- **L2** (earlier, user, verbatim): "Podemos usar aiand no solo de fallback sino que jev lanza la alerta y luego con aiand analizamos en detalle que es lo que ocurre y generamos un informe de la situacion, con diferentes parametros, urgencia, peligrosidad, no se cosas como esa y un brief"
+- **L3** Evidence from spikes (`spike/`, `docs/09`, `docs/10`, `docs/11`): all integrations verified; Jev 71 sites in 5.6 s; ask "industrial within ~400 m" due to VIIRS ~375 m geolocation; Ofunato archive = 103 detections.

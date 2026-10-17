@@ -1,0 +1,641 @@
+[
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h01",
+   "lat": 34.7119,
+   "lon": 134.8232,
+   "frp": 11.1,
+   "acq_date": "2025-02-26",
+   "acq_time": "0325",
+   "detections": 2
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h02",
+   "lat": 33.2614,
+   "lon": 131.6524,
+   "frp": 20.2,
+   "acq_date": "2025-02-26",
+   "acq_time": "0452",
+   "detections": 1
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h01",
+   "verdict": "industrial",
+   "source": "memory",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 3,
+   "image_url": null
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h02",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 183,
+   "image_url": "/api/images/h02_z16.jpg"
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h03",
+   "lat": 39.07,
+   "lon": 141.78,
+   "frp": 48.6,
+   "acq_date": "2025-02-26",
+   "acq_time": "0334",
+   "detections": 4
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h04",
+   "lat": 33.7852,
+   "lon": 130.9982,
+   "frp": 4.6,
+   "acq_date": "2025-02-26",
+   "acq_time": "0403",
+   "detections": 5
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h03",
+   "verdict": "possible_fire",
+   "source": "jev",
+   "confidence": 0.91,
+   "signals": {
+    "industrial_nearby": {
+     "value": false,
+     "probability": 0.04
+    },
+    "vegetation_nearby": {
+     "value": true,
+     "probability": 0.94
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.81
+    }
+   },
+   "latency_ms": 194,
+   "image_url": "/api/images/h03_z16.jpg"
+  }
+ },
+ {
+  "event": "probe",
+  "data": {
+   "id": "h03",
+   "latency_ms": 940,
+   "images": {
+    "close": "/api/images/h03_z16.jpg",
+    "wide": "/api/images/h03_z14.jpg",
+    "satellite": "/api/images/h03_sat_20250226.jpg"
+   },
+   "answers": {
+    "fuel_type": {
+     "value": "coniferous forest (cedar / pine)",
+     "confidence": 0.88
+    },
+    "vegetation_continuity_to_houses": {
+     "value": true,
+     "probability": 0.79
+    },
+    "nearest_settlement_distance_m": {
+     "value": 850,
+     "confidence": 0.7
+    },
+    "nearest_settlement_direction": {
+     "value": "SE",
+     "confidence": 0.74
+    },
+    "settlement_size": {
+     "value": "small village (~40 houses)",
+     "confidence": 0.66
+    },
+    "terrain_steep": {
+     "value": true,
+     "probability": 0.83
+    },
+    "firebreak_present": {
+     "value": false,
+     "probability": 0.31
+    },
+    "water_source_for_helicopters": {
+     "value": true,
+     "probability": 0.92
+    },
+    "smoke_plume_visible": {
+     "value": true,
+     "probability": 0.77
+    },
+    "cloud_cover": {
+     "value": false,
+     "probability": 0.12
+    },
+    "industrial_recheck": {
+     "value": false,
+     "probability": 0.03
+    }
+   }
+  },
+  "delay": 500
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h04",
+   "verdict": "industrial",
+   "source": "memory",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 4,
+   "image_url": null
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h05",
+   "lat": 42.3371,
+   "lon": 140.9946,
+   "frp": 27.5,
+   "acq_date": "2025-02-26",
+   "acq_time": "0302",
+   "detections": 2
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h06",
+   "lat": 35.942,
+   "lon": 140.695,
+   "frp": 4.4,
+   "acq_date": "2025-02-26",
+   "acq_time": "0404",
+   "detections": 4
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h05",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 182,
+   "image_url": "/api/images/h05_z16.jpg"
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h06",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 240,
+   "image_url": "/api/images/h06_z16.jpg"
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h07",
+   "lat": 34.06,
+   "lon": 134.62,
+   "frp": 8.7,
+   "acq_date": "2025-02-26",
+   "acq_time": "0327",
+   "detections": 5
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h08",
+   "lat": 35.5805,
+   "lon": 140.0858,
+   "frp": 3.7,
+   "acq_date": "2025-02-26",
+   "acq_time": "0407",
+   "detections": 5
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h07",
+   "verdict": "water",
+   "source": "jev",
+   "confidence": 0.86,
+   "signals": {
+    "industrial_nearby": {
+     "value": false,
+     "probability": 0.04
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": false,
+     "probability": 0.05
+    }
+   },
+   "latency_ms": 178,
+   "image_url": "/api/images/h07_z16.jpg"
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h08",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 177,
+   "image_url": "/api/images/h08_z16.jpg"
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h09",
+   "lat": 34.46,
+   "lon": 133.428,
+   "frp": 28.5,
+   "acq_date": "2025-02-26",
+   "acq_time": "0340",
+   "detections": 6
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h10",
+   "lat": 34.507,
+   "lon": 133.736,
+   "frp": 18.3,
+   "acq_date": "2025-02-26",
+   "acq_time": "0436",
+   "detections": 1
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h09",
+   "verdict": "industrial",
+   "source": "memory",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 6,
+   "image_url": null
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h10",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 196,
+   "image_url": "/api/images/h10_z16.jpg"
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h11",
+   "lat": 43.3,
+   "lon": 142.4,
+   "frp": 18.4,
+   "acq_date": "2025-02-26",
+   "acq_time": "0314",
+   "detections": 1
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h12",
+   "lat": 34.152,
+   "lon": 135.155,
+   "frp": 3.3,
+   "acq_date": "2025-02-26",
+   "acq_time": "0418",
+   "detections": 2
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h11",
+   "verdict": "other",
+   "source": "jev",
+   "confidence": 0.86,
+   "signals": {
+    "industrial_nearby": {
+     "value": false,
+     "probability": 0.04
+    },
+    "vegetation_nearby": {
+     "value": true,
+     "probability": 0.7
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 233,
+   "image_url": "/api/images/h11_z16.jpg"
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h12",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 238,
+   "image_url": "/api/images/h12_z16.jpg"
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h13",
+   "lat": 35.042,
+   "lon": 136.88,
+   "frp": 13.7,
+   "acq_date": "2025-02-26",
+   "acq_time": "0307",
+   "detections": 5
+  }
+ },
+ {
+  "event": "hotspot",
+  "data": {
+   "id": "h14",
+   "lat": 34.035,
+   "lon": 131.79,
+   "frp": 18.0,
+   "acq_date": "2025-02-26",
+   "acq_time": "0452",
+   "detections": 5
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h13",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 224,
+   "image_url": "/api/images/h13_z16.jpg"
+  }
+ },
+ {
+  "event": "triage",
+  "data": {
+   "id": "h14",
+   "verdict": "industrial",
+   "source": "jev",
+   "confidence": 0.98,
+   "signals": {
+    "industrial_nearby": {
+     "value": true,
+     "probability": 0.97
+    },
+    "vegetation_nearby": {
+     "value": false,
+     "probability": 0.12
+    },
+    "houses_nearby": {
+     "value": true,
+     "probability": 0.55
+    }
+   },
+   "latency_ms": 210,
+   "image_url": "/api/images/h14_z16.jpg"
+  }
+ },
+ {
+  "event": "report",
+  "data": {
+   "id": "h03",
+   "scores": {
+    "danger": 4,
+    "spread_risk": 3,
+    "exposure": 2,
+    "urgency": 4
+   },
+   "confidence": "medium",
+   "headline_ja": "大船渡市赤崎町の山林で林野火災の可能性、南東の集落へ延焼の恐れ",
+   "headline_en": "Possible forest fire in Akasaki, Ofunato; risk of spread toward settlement to the SE",
+   "brief_ja": "大船渡市赤崎町の山林で熱源を4回検知（FRP 48.6 MW）。急斜面の針葉樹林で、南東約850 mに約40戸の集落があります。北西の風 7.2 m/s（最大瞬間 14.1 m/s）、湿度28%、無降水11日で延焼条件がそろっています。消防による現地確認と、集落への早期情報提供を推奨します。",
+   "brief_en": "Heat source detected 4 times in forest at Akasaki, Ofunato (FRP 48.6 MW). Steep coniferous slope; a village of ~40 houses lies ~850 m to the SE. NW wind 7.2 m/s (gusts 14.1 m/s), humidity 28%, 11 days without rain: conditions favour spread. Recommend fire-department ground confirmation and early notice to the village.",
+   "key_evidence": [
+    "4 VIIRS detections, FRP 48.6 MW",
+    "Jev: vegetation nearby (0.94), no industrial facility within 400 m (0.04)",
+    "Coniferous fuel on a steep slope (0.83)",
+    "Wind from NW blowing toward the settlement to the SE",
+    "Humidity 28%, 11 days without rain"
+   ],
+   "unknowns": [
+    "Ground truth not confirmed",
+    "Exact fire-front extent beyond 375 m pixel",
+    "Whether the village has been notified"
+   ],
+   "recommended_actions": [
+    "Request fire-department ground confirmation",
+    "Prepare early warning for the settlement ~850 m SE",
+    "Pre-position helicopter water source (Ofunato Bay, 1.2 km)"
+   ],
+   "weather": {
+    "wind_speed_ms": 7.2,
+    "wind_gust_ms": 14.1,
+    "wind_direction": "NW (315°)",
+    "relative_humidity_pct": 28,
+    "days_without_rain": 11,
+    "temperature_c": 9.4
+   },
+   "latency_ms": 4870,
+   "generated_at": "2025-02-26T05:41:12Z"
+  },
+  "delay": 1200
+ },
+ {
+  "event": "summary",
+  "data": {
+   "mode": "mock",
+   "total": 14,
+   "in_japan": 14,
+   "filtered_industrial": 11,
+   "memory_hits": 3,
+   "alerts": 1,
+   "jev_calls": 12,
+   "elapsed_s": 8.4
+  }
+ },
+ {
+  "event": "done",
+  "data": {}
+ }
+]

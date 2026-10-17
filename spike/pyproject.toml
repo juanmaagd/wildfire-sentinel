@@ -1,0 +1,12 @@
+[project]
+name = "spike"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "neo4j-agent-memory[sentence-transformers]>=0.7.0",
+    "openai>=3.33.0",
+    "pillow>=13.0.0",
+    "python-dotenv>=1.2.4",
+    "typesafe-sdk>=0.7.5",
+]
