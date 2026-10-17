@@ -17,13 +17,13 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 
 | ID | Specs | Task | Route | Status | Commit |
 | --- | --- | --- | --- | --- | --- |
-| T1 | S1,S5 | Sources: FIRMS (live + archive), GSI mosaics (z16, z14), Open-Meteo weather, satellite tile | inline | todo | |
-| T2 | S1,S4 | Stage 1 sentinel (Jev) + memory filter | inline | todo | |
-| T3 | S2 | Stage 2 deep probe (Jev fan-out), validated on Ofunato replay | inline | todo | |
-| T4 | S3,S7 | Composite scoring + action rules (pure, tested) | inline | todo | |
-| T5 | S3 | ai& analyst report (strict JSON) | inline | todo | |
-| T6 | S1,S5 | Pipeline + FastAPI SSE (`/api/run?mode=live|replay`) | inline | todo | |
-| T7 | S6 | Map UI (`web/`) against the event contract below | delegated (parallel unit, disjoint surface `web/`) | todo | |
+| T1 | S1,S5 | Sources: FIRMS (live + archive), GSI mosaics (z16, z14), Open-Meteo weather, satellite tile | inline | done | 3f1efac |
+| T2 | S1,S4 | Stage 1 sentinel (Jev) + memory filter | inline | done | 3f1efac |
+| T3 | S2 | Stage 2 deep probe (Jev fan-out), validated on Ofunato replay | inline | done | 3f1efac |
+| T4 | S3,S7 | Composite scoring + action rules (pure, tested) | inline | done (20 tests green) | 3f1efac |
+| T5 | S3 | ai& analyst report (strict JSON) | inline | done | 3f1efac |
+| T6 | S1,S5 | Pipeline + FastAPI SSE (`/api/run?mode=live|replay`) | inline | done | 3f1efac |
+| T7 | S6 | Map UI (`web/`) against the event contract below | delegated (parallel unit, disjoint surface `web/`) | done (worker; verified mock + real backend) | 3f1efac |
 | T8 | — | README, submission text, rehearsal, backup recording | inline | todo | |
 
 ## Event contract (SSE, `GET /api/run?mode=live|replay`)
@@ -41,3 +41,5 @@ Branch: `feat/wildfire-sentinel` · Delivery: single-pr (hackathon) · Test runn
 - **L1** (2026-10-17, user, verbatim): "Si está bien por ahora, lo que me importa es que se alerte inmediato de un incendio o posible foco sabes, no apalancamos de jev que es extremadamente rapido y economico, luego si detectamos un posible foco podemos hacer mas llamadas para diferentes puntos de analisis asi es como funciona jev sabes lo que quiero decir"
 - **L2** (earlier, user, verbatim): "Podemos usar aiand no solo de fallback sino que jev lanza la alerta y luego con aiand analizamos en detalle que es lo que ocurre y generamos un informe de la situacion, con diferentes parametros, urgencia, peligrosidad, no se cosas como esa y un brief"
 - **L3** Evidence from spikes (`spike/`, `docs/09`, `docs/10`, `docs/11`): all integrations verified; Jev 71 sites in 5.6 s; ask "industrial within ~400 m" due to VIIRS ~375 m geolocation; Ofunato archive = 103 detections.
+- **L4** (user, verbatim): "cabe aclarar que no haremos muchos tests, los minimos posibles, neceistamos velocidad de ejecucion sin enredarnos esto no debe ser escalable, buscamos velocidad de accion"
+- **L5** Verified end to end: Ofunato replay 48 hotspots, 37 Jev calls, 3-4 ai& reports in ~23 s; UI renders alerts, report JA/EN. Fixes: Neo4j deadlock (serialized memory writes), embedding warmup at startup, reports in background, text model for reports (5-11 s vs 20-47 s vision), replay forgets Ofunato area first.
