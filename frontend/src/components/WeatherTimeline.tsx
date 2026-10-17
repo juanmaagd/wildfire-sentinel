@@ -15,6 +15,8 @@ export interface Props {
   hour: number
   onHour: (h: number) => void
   marks?: number[]
+  plans?: { hour: number; label: string; active: boolean }[] // response plans decided at these hours
+  onPlan?: (i: number) => void
 }
 
 const H = 168
@@ -87,7 +89,7 @@ interface RainRun {
   total: number
 }
 
-export default function WeatherTimeline({ hourly, hour, onHour, marks = [] }: Props) {
+export default function WeatherTimeline({ hourly, hour, onHour, marks = [], plans = [], onPlan }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const draggingRef = useRef(false)
@@ -392,6 +394,50 @@ export default function WeatherTimeline({ hourly, hour, onHour, marks = [] }: Pr
                 pointerEvents="none"
               />
             ))}
+
+          {/* Response plans: dashed line at the decision hour + clickable flag */}
+          {plans.map((p, i) =>
+            p.hour < 0 || p.hour > maxHour ? null : (
+              <g key={`plan-${i}`}>
+                <line
+                  x1={x(p.hour)}
+                  x2={x(p.hour)}
+                  y1={0}
+                  y2={RAIN_BOT}
+                  stroke={p.active ? C.lime : C.ash}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  pointerEvents="none"
+                />
+                <g
+                  style={{ cursor: 'pointer' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation()
+                    onPlan?.(i)
+                  }}
+                >
+                  <rect
+                    x={x(p.hour) + 2}
+                    y={0}
+                    width={26}
+                    height={15}
+                    rx={2}
+                    fill={p.active ? C.lime : C.canvas}
+                    stroke={p.active ? C.lime : C.ash}
+                  />
+                  <text
+                    x={x(p.hour) + 15}
+                    y={11}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fill={p.active ? C.canvas : C.bone}
+                  >
+                    {p.label}
+                  </text>
+                </g>
+              </g>
+            ),
+          )}
 
           {/* Hover crosshair and tooltip */}
           {hoverIdx !== null && hovered && (

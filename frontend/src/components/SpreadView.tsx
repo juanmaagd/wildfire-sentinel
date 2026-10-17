@@ -97,7 +97,9 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
   const [playing, setPlaying] = useState(false)
   const dataRef = useRef<SpreadData | null>(null)
   // Response plan: on demand, decided at the timeline hour the user is looking at.
-  const [plan, setPlan] = useState<PlanData | null>(null)
+  const [plans, setPlans] = useState<PlanData[]>([])
+  const [active, setActive] = useState<number | null>(null)
+  const plan = active !== null ? (plans[active] ?? null) : null
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
   const [showPlan, setShowPlan] = useState(false)
@@ -113,7 +115,11 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
     try {
       const res = await fetch(`/api/plan?${q}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setPlan((await res.json()) as PlanData)
+      const next = (await res.json()) as PlanData
+      // Keep earlier plans; a new plan at the same hour replaces the old one. Sorted by decision hour.
+      const list = [...plans.filter((p) => p.at_hour !== next.at_hour), next].sort((a, b) => a.at_hour - b.at_hour)
+      setPlans(list)
+      setActive(list.indexOf(next))
       setShowPlan(true)
     } catch (err) {
       setPlanError((err as Error).message)
@@ -341,11 +347,12 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
       {plan && showPlan && (
         <aside className="absolute bottom-6 right-6 top-[96px] flex w-[400px] flex-col bg-canvas/90 backdrop-blur-sm">
           <div className="flex items-start justify-between gap-3 border-b border-iron px-4 py-3 font-mono text-[12px] uppercase tracking-wider text-ash">
-            <span>Response plan · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${plan.plan_time.slice(5).replace('T', ' ')} JST` : ''}</span>
+            <span>Plan P{(active ?? 0) + 1} · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${plan.plan_time.slice(5).replace('T', ' ')} JST` : ''}</span>
             <button
               type="button"
               onClick={() => {
-                setPlan(null)
+                setPlans((ps) => ps.filter((p) => p !== plan))
+                setActive(null)
                 setShowPlan(false)
               }}
               className="flex shrink-0 items-center gap-1 text-bone hover:text-lime"
@@ -408,6 +415,13 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
                   hourly={data.weather_hourly}
                   hour={hour}
                   marks={data.hours}
+                  plans={plans.map((p, i) => ({ hour: p.at_hour, label: `P${i + 1}`, active: showPlan && i === active }))}
+                  onPlan={(i) => {
+                    setPlaying(false)
+                    setActive(i)
+                    setShowPlan(true)
+                    setHour(plans[i].at_hour)
+                  }}
                   onHour={(h) => {
                     setPlaying(false)
                     setHour(h)
