@@ -48,6 +48,9 @@ export interface PlanData {
 interface VideoSegment { id: string; from_h: number; to_h: number; status: string; url: string | null; error: { message?: string } | null }
 interface VideoJob { id: string; hours: number[]; segments: VideoSegment[]; status: 'in_progress' | 'completed' | 'failed'; created: number }
 
+// AI video (MiniMax H3 on ai&) is hidden: the team decided not to generate videos. Flip to show it again.
+const SHOW_AI_VIDEO = false
+
 // Keyframes for the AI video: ignition, two intermediate prediction horizons and the target hour.
 function keyframes(target: number, horizons: number[]): number[] {
   const nearest = (h: number) => horizons.reduce((a, b) => (Math.abs(b - h) < Math.abs(a - h) ? b : a))
@@ -316,7 +319,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
   }
 
   useEffect(() => {
-    if (forceMock) return
+    if (forceMock || !SHOW_AI_VIDEO) return
     fetch(`/api/videos?${scenarioQuery()}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((list: VideoJob[]) => setVideos(list))
@@ -618,6 +621,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
                 </div>
               )}
               {planError && <span className="font-mono text-[12px] text-ash">plan failed: {planError}</span>}
+              {SHOW_AI_VIDEO && (
               <button
                 type="button"
                 onClick={requestVideo}
@@ -632,7 +636,8 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
                     ? `Rendering ${renderingVideo.segments.filter((s) => s.url).length}/${renderingVideo.segments.length}…`
                     : `AI video to +${keyframes(Math.floor(hour) > 0 ? Math.floor(hour) : 24, data.hours).slice(-1)[0]}h`}
               </button>
-              {latestVideo && (
+              )}
+              {SHOW_AI_VIDEO && latestVideo && (
                 <button
                   type="button"
                   onClick={() => setPlayer(latestVideo)}
@@ -641,7 +646,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
                   Watch AI video
                 </button>
               )}
-              {(videoError || videos.some((v) => v.status === 'failed')) && (
+              {SHOW_AI_VIDEO && (videoError || videos.some((v) => v.status === 'failed')) && (
                 <span className="font-mono text-[12px] text-ash">video failed{videoError ? `: ${videoError}` : ''}</span>
               )}
             </div>
