@@ -190,8 +190,8 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
       map.addLayer({ id: 'seeds', type: 'circle', source: 'seeds', paint: { 'circle-radius': 4, 'circle-color': '#ff8a1f', 'circle-stroke-color': '#13140e', 'circle-stroke-width': 1 } })
       map.addLayer({ id: 'obs', type: 'circle', source: 'obs', filter: ['<=', ['get', 'hours_after'], -1], paint: { 'circle-radius': 5, 'circle-color': '#f4f3e8', 'circle-stroke-color': '#13140e', 'circle-stroke-width': 1.5 } })
       // Control line of the response plan (UI accent: it is an action, not fire data).
-      map.addLayer({ id: 'ctl-fill', type: 'fill', source: 'ctl', paint: { 'fill-color': '#ebfc72', 'fill-opacity': 0.55 } })
-      map.addLayer({ id: 'ctl-line', type: 'line', source: 'ctl', paint: { 'line-color': '#ebfc72', 'line-width': 2 } })
+      // The line is a one-cell band: its contours are drawn as lines only (a fill would cover the whole interior).
+      map.addLayer({ id: 'ctl-line', type: 'line', source: 'ctl', paint: { 'line-color': '#ebfc72', 'line-width': 3 } })
       readyRef.current = true
       applyData()
     })
@@ -339,9 +339,20 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
       </div>
 
       {plan && showPlan && (
-        <aside className="absolute bottom-[200px] right-6 top-[96px] flex w-[400px] flex-col bg-canvas/90 backdrop-blur-sm">
-          <div className="border-b border-iron px-4 py-3 font-mono text-[12px] uppercase tracking-wider text-ash">
-            Response plan · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${plan.plan_time.slice(5).replace('T', ' ')} JST` : ''}
+        <aside className="absolute bottom-6 right-6 top-[96px] flex w-[400px] flex-col bg-canvas/90 backdrop-blur-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-iron px-4 py-3 font-mono text-[12px] uppercase tracking-wider text-ash">
+            <span>Response plan · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${plan.plan_time.slice(5).replace('T', ' ')} JST` : ''}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPlan(null)
+                setShowPlan(false)
+              }}
+              className="flex shrink-0 items-center gap-1 text-bone hover:text-lime"
+              aria-label="Discard plan"
+            >
+              <X size={14} /> Discard
+            </button>
           </div>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             <div className="grid grid-cols-3 gap-3 font-mono tabular-nums">
@@ -389,7 +400,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
       )}
 
       {data && (
-        <div className="absolute inset-x-0 bottom-0 p-6">
+        <div className={`absolute inset-x-0 bottom-0 p-6 ${plan && showPlan ? 'pr-[448px]' : ''}`}>
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 bg-canvas/80 backdrop-blur-sm px-5 py-3">
             {data.weather_hourly && data.weather_hourly.length > 1 && (
               <div className="w-full">
@@ -440,7 +451,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
                 className="flex items-center gap-2 rounded-[3.6px] border border-lime px-[12px] py-[7px] font-mono text-[12px] uppercase tracking-wider text-lime hover:bg-lime hover:text-canvas disabled:opacity-50"
               >
                 {planLoading && <span className="size-3 animate-spin rounded-[50%] border-2 border-iron border-t-lime" />}
-                {planLoading ? 'Planning…' : `Plan response at +${Math.floor(hour)}h`}
+                {planLoading ? 'Planning…' : `${plan ? 'Re-plan' : 'Plan response'} at +${Math.floor(hour)}h`}
               </button>
               {plan && (
                 <div className="flex border border-iron" role="group" aria-label="Scenario">
