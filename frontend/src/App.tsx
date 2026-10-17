@@ -7,6 +7,7 @@ import AlertsList from './components/AlertsList'
 import DetailPanel from './components/DetailPanel'
 import Feed from './components/Feed'
 import SpreadView from './components/SpreadView'
+import FireGraphView from './components/FireGraphView'
 import { buildIncidents } from './lib/incidents'
 import type { VerdictFilter } from './components/HotspotMap'
 import { useRun } from './useRun'
@@ -18,6 +19,7 @@ export default function App() {
   const [fly, setFly] = useState<Focus | null>(null)
   const [bad, setBad] = useState<Set<string>>(() => new Set())
   const [spreadOpen, setSpreadOpen] = useState(false)
+  const [graphOpen, setGraphOpen] = useState(false)
   const [kpisOpen, setKpisOpen] = useState(false)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [feedOpen, setFeedOpen] = useState(false)
@@ -202,6 +204,7 @@ export default function App() {
                 badImages={bad}
                 onBadImage={onBadImage}
                 onOpen3D={() => setSpreadOpen(true)}
+                onOpenGraph={replay ? () => setGraphOpen(true) : undefined}
                 onRequestReport={() => requestReport(selected.id)}
                 reportLoading={reportLoading === selected.id}
               />
@@ -237,6 +240,10 @@ export default function App() {
           <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full border border-lime" />memory</span>
         </div>
       </main>
+
+      {graphOpen && spreadFrom?.day && (
+        <FireGraphView lat={spreadFrom.lat} lon={spreadFrom.lon} day={spreadFrom.day} name="Ofunato" onClose={() => setGraphOpen(false)} />
+      )}
 
       {spreadOpen && spreadFrom && selected && (
         <SpreadView

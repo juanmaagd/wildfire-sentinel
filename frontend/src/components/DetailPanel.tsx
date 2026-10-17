@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import Lightbox from './Lightbox'
-import { Globe2 } from 'lucide-react'
+import { Globe2, Share2 } from 'lucide-react'
 import type { Lang, Report, Signal, Site } from '../types'
 import { fmtAcq, humanize, ms, num, siteCoord, verdictLabel } from '../lib/format'
 
@@ -11,6 +11,7 @@ interface Props {
   badImages: Set<string>
   onBadImage: (url: string) => void
   onOpen3D: () => void
+  onOpenGraph?: () => void
   onRequestReport: () => void
   reportLoading: boolean
 }
@@ -88,7 +89,7 @@ const SCORE_ITEMS: [keyof Report['scores'], string][] = [
   ['exposure', 'Exposure'],
 ]
 
-export default function DetailPanel({ site, lang, setLang, badImages, onBadImage, onOpen3D, onRequestReport, reportLoading }: Props) {
+export default function DetailPanel({ site, lang, setLang, badImages, onBadImage, onOpen3D, onOpenGraph, onRequestReport, reportLoading }: Props) {
   const [viewer, setViewer] = useState<number | null>(null)
   if (!site) {
     return (
@@ -156,6 +157,16 @@ export default function DetailPanel({ site, lang, setLang, badImages, onBadImage
           className="flex w-full items-center justify-center gap-3 rounded-[3.6px] bg-lime px-[18px] py-[12px] font-mono text-[13px] uppercase tracking-wider text-canvas hover:bg-olive"
         >
           <Globe2 size={22} /> 3D spread prediction
+        </button>
+      )}
+
+      {site.hotspot && t?.verdict === 'possible_fire' && onOpenGraph && (
+        <button
+          type="button"
+          onClick={onOpenGraph}
+          className="flex w-full items-center justify-center gap-3 rounded-[3.6px] border border-iron px-[18px] py-[12px] font-mono text-[13px] uppercase tracking-wider text-bone hover:border-lime hover:text-lime"
+        >
+          <Share2 size={20} /> Fire graph · Neo4j
         </button>
       )}
 

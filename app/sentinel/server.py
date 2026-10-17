@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 
-from . import analyst, memory, sources, spread
+from . import analyst, graph, memory, sources, spread
 from .config import IMAGES_DIR, ROOT
 from .pipeline import ASSESSED, HOTSPOTS, Run, report_on_demand
 
@@ -104,6 +104,12 @@ async def response_plan(lat: float, lon: float, at_hour: int = 0, day: str | Non
         result["brief"] = None
         result["brief_error"] = f"{type(exc).__name__}: {exc}"
     return result
+
+
+@app.get("/api/graph")
+async def fire_graph(lat: float, lon: float, day: str, name: str = "Fire incident") -> dict:
+    """Write the incident's propagation graph to Neo4j and return it with the Cypher-computed insights."""
+    return await asyncio.to_thread(graph.build, lat, lon, day, name)
 
 
 @app.get("/api/report/{hotspot_id}")
