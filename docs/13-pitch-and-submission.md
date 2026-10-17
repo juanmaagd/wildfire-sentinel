@@ -107,7 +107,7 @@ Judges from `docs/05`. Their interests are inferred, not confirmed.
 - **Member names:** [MEMBER NAMES]
 - **Member emails:** [MEMBER EMAILS]
 - **Project name:** Wildfire Sentinel [confirm final name; "TBD" in `docs/12`]
-- **Code repository URL:** [REPO URL: public, or invite the organizers]
+- **Code repository URL:** https://github.com/juanmaagd/wildfire-sentinel
 
 **Description (2–3 sentences):**
 
