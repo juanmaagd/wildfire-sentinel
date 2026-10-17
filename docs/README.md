@@ -28,6 +28,8 @@ Saturday 17 October 2026 · Good Space Kanda Tekko 5F · hosted by +81 Builders.
 10. [Integrations](10-integrations.md) — verified snippets for FIRMS, GSI, Jev, ai&, Neo4j, FastAPI
 11. [Neo4j brief](11-neo4j-brief.md) — sponsor brief, Agent Memory / Document Intelligence / Aura MCP, feedback log
 12. [Product design](12-product-design.md) — roles, flow, situation report schema, demo modes
+13. [Pitch and submission](13-pitch-and-submission.md) — 3-minute script, judge Q&A, form text
+14. [Cómo funciona (ES)](14-como-funciona.md) — guía en español: servicios, Jev, Neo4j, grafo, predicción, plan
 
 ## Sources
 
