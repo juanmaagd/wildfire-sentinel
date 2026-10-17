@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import memory, sources, spread
 from .config import IMAGES_DIR, ROOT
-from .pipeline import Run
+from .pipeline import HOTSPOTS, Run, report_on_demand
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # embedding model is cached locally; don't hit the HF Hub per run
 
@@ -63,6 +63,13 @@ async def run(mode: str = "live") -> AsyncIterable[ServerSentEvent]:
 async def spread_prediction(lat: float, lon: float, day: str | None = None, fuel: str = "conifer_forest") -> dict:
     wx = await asyncio.to_thread(sources.weather, lat, lon, day)
     return await asyncio.to_thread(spread.simulate, lat, lon, wx, fuel)
+
+
+@app.get("/api/report/{hotspot_id}")
+async def report(hotspot_id: str) -> dict:
+    if hotspot_id not in HOTSPOTS:
+        raise HTTPException(404, "unknown hotspot (run live or replay first)")
+    return await report_on_demand(hotspot_id)
 
 
 @app.get("/api/images/{name}")

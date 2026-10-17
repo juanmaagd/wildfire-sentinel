@@ -12,6 +12,73 @@ from . import analyst, jev, memory, scoring, sources
 from .config import JAPAN_BBOX, OFUNATO_BBOX, REPLAY_DAYS, REPLAY_START
 
 Emit = Callable[[str, dict], Awaitable[None]]
+
+# On-demand ai& reports need what the run already computed; kept in process (single-user demo).
+HOTSPOTS: dict[str, sources.Hotspot] = {}
+ASSESSED: dict[str, dict] = {}  # id -> {"facts", "wide", "assessment"}
+
+
+def _jst(h: sources.Hotspot) -> str:
+    utc = datetime.strptime(f"{h.acq_date} {int(h.acq_time):04d}", "%Y-%m-%d %H%M").replace(tzinfo=timezone.utc)
+    return utc.astimezone(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M JST")
+
+
+async def assess(h: sources.Hotspot, mem, jv, day: str | None, detections: int) -> tuple[dict, dict]:
+    """Jev stage-2 probe + weather + rule scores. Returns (probe event, assessment event) and caches the facts."""
+    close = sources.IMAGES_DIR / f"{h.lat:.4f}_{h.lon:.4f}_z16.jpg"
+    wide_name, sat_name = f"{h.lat:.4f}_{h.lon:.4f}_z14.jpg", f"{h.lat:.4f}_{h.lon:.4f}_{h.acq_date}_sat.jpg"
+    if not close.exists():
+        await asyncio.to_thread(sources.aerial_mosaic, h.lat, h.lon, 16, close.name)
+    wide, sat = await asyncio.gather(
+        asyncio.to_thread(sources.aerial_mosaic, h.lat, h.lon, 14, wide_name),
+        asyncio.to_thread(sources.satellite_tile, h.lat, h.lon, h.acq_date, sat_name),
+        return_exceptions=True,
+    )
+    if isinstance(wide, BaseException):
+        raise wide
+    if isinstance(sat, BaseException):  # satellite context is optional; flaky networks shouldn't drop the analysis
+        sat = None
+    flat, detail, ms = await jev.probe(jv, close, wide, sat)
+    probe_event = {"id": h.id, "answers": detail, "latency_ms": ms,
+                   "images": {"close": _img(close.name), "wide": _img(wide_name), "satellite": _img(sat_name) if sat else None}}
+    wx = await asyncio.to_thread(sources.weather, h.lat, h.lon, day)
+    scores = scoring.score(flat, wx, {"frp": h.frp, "detections": detections})
+    actions = scoring.recommended_actions(scores, flat)
+    facts = {
+        # Only the JST time is given, so the model can't mix it up with the raw UTC acquisition time.
+        "hotspot": {"lat": h.lat, "lon": h.lon, "frp_mw": h.frp, "detected_at": _jst(h),
+                    "detections_in_area_this_pass": detections},
+        # Labels, not raw scale positions: the model must not read "2.9" as a quantity.
+        "jev_probe": {k: v.get("label", v["value"]) for k, v in detail.items()},
+        "weather": wx,
+        "scores_1_to_5": {k: scores[k] for k in ("danger", "spread_risk", "exposure", "urgency")},
+        "score_factors_0_to_1": scores["factors"],
+        "houses_downwind": scores["downwind"],
+        "memory_known_sites_within_5km": await memory.history(mem, h.lat, h.lon),
+        "recommended_actions_from_rules": actions,
+    }
+    assessment = {
+        "id": h.id, "scores": {k: scores[k] for k in ("danger", "spread_risk", "exposure", "urgency")},
+        "confidence": scores["confidence"], "downwind": scores["downwind"], "factors": scores["factors"],
+        "recommended_actions": actions, "weather": wx, "detected_at": _jst(h), "brief_pending": True,
+    }
+    await memory.remember_report(mem, h, scores, "rules", ms)
+    ASSESSED[h.id] = {"facts": facts, "wide": wide, "assessment": assessment, "probe": probe_event}
+    return probe_event, assessment
+
+
+async def report_on_demand(hotspot_id: str) -> dict:
+    """ai& situation report for one alert, only when a user asks for it."""
+    if hotspot_id not in ASSESSED:
+        h = HOTSPOTS[hotspot_id]
+        day = h.acq_date if h.acq_date != sources.today() else None
+        async with memory.client() as mem, jev.client() as jv:
+            await assess(h, mem, jv, day, h.detections)
+    cached = ASSESSED[hotspot_id]
+    rep, model, rep_ms = await analyst.report(cached["facts"], cached["wide"])
+    report = {**cached["assessment"], **rep, "brief_pending": False, "model": model, "latency_ms": rep_ms,
+              "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    return {"probe": cached["probe"], "report": report}
 MAX_REPORTS_PER_BATCH = 1
 JEV_CONCURRENCY = 8
 
@@ -41,6 +108,7 @@ class Run:
             return None
 
     async def _triage_one(self, h: sources.Hotspot, mem, jv, sem) -> sources.Hotspot | None:
+        HOTSPOTS[h.id] = h
         await self.emit("hotspot", h.as_event())
         known = await memory.lookup(mem, h.lat, h.lon)
         if known:
@@ -74,43 +142,11 @@ class Run:
         return None
 
     async def analyse(self, h: sources.Hotspot, mem, jv, day: str | None, batch_detections: int) -> None:
-        close = sources.IMAGES_DIR / f"{h.lat:.4f}_{h.lon:.4f}_z16.jpg"
-        wide_name, sat_name = f"{h.lat:.4f}_{h.lon:.4f}_z14.jpg", f"{h.lat:.4f}_{h.lon:.4f}_{h.acq_date}_sat.jpg"
-        wide, sat = await asyncio.gather(
-            asyncio.to_thread(sources.aerial_mosaic, h.lat, h.lon, 14, wide_name),
-            asyncio.to_thread(sources.satellite_tile, h.lat, h.lon, h.acq_date, sat_name),
-        )
-        flat, detail, ms = await jev.probe(jv, close, wide, sat)
+        """Automatic, cheap part: Jev deep probe + rule-based scores. The ai& report is on demand."""
+        probe_event, assessment = await assess(h, mem, jv, day, batch_detections)
         self.stats["jev_calls"] += 1
-        await self.emit("probe", {"id": h.id, "answers": detail, "latency_ms": ms,
-                                  "images": {"close": _img(close.name), "wide": _img(wide_name), "satellite": _img(sat_name) if sat else None}})
-
-        wx = await asyncio.to_thread(sources.weather, h.lat, h.lon, day)
-        firms = {"frp": h.frp, "detections": batch_detections}
-        scores = scoring.score(flat, wx, firms)
-        actions = scoring.recommended_actions(scores, flat)
-        facts = {
-            "hotspot": {**h.as_event(), "detections_in_area_this_pass": batch_detections, "frp_unit": "MW",
-                        "acq_time_utc": h.acq_time},
-            # Labels, not raw scale positions: the model must not read "2.9" as a quantity.
-            "jev_probe": {k: v.get("label", v["value"]) for k, v in detail.items()},
-            "weather": wx,
-            "scores_1_to_5": {k: scores[k] for k in ("danger", "spread_risk", "exposure", "urgency")},
-            "score_factors_0_to_1": scores["factors"],
-            "houses_downwind": scores["downwind"],
-            "memory_known_sites_within_5km": await memory.history(mem, h.lat, h.lon),
-            "recommended_actions_from_rules": actions,
-        }
-        rep, model, rep_ms = await analyst.report(facts, wide)
-        self.stats["reports"] += 1
-        await memory.remember_report(mem, h, scores, model, rep_ms)
-        await self.emit("report", {
-            "id": h.id, **rep,
-            "scores": {k: scores[k] for k in ("danger", "spread_risk", "exposure", "urgency")},
-            "confidence": scores["confidence"], "downwind": scores["downwind"], "factors": scores["factors"],
-            "recommended_actions": actions, "weather": wx, "model": model, "latency_ms": rep_ms,
-            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        })
+        await self.emit("probe", probe_event)
+        await self.emit("report", assessment)
 
     async def batch(self, hotspots: list[sources.Hotspot], mem, jv, day: str | None) -> None:
         self.stats["total"] += len(hotspots)

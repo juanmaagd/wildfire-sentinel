@@ -96,8 +96,6 @@ function onEvent(state: State, name: string, raw: unknown, at: number): State {
         : pushFeed(next, `Jev → ${t.verdict} (${num(t.confidence)}) · ${ms(t.latency_ms)}`, undefined, at)
       if (t.verdict === 'possible_fire') {
         next = pushFeed(next, `ALERT possible fire at ${siteCoord(s)}`, 'alert', at)
-        const cur = next.selectedId ? next.sites[next.selectedId] : undefined
-        if (!cur || !cur.report) next = { ...next, selectedId: t.id }
       }
       return next
     }
@@ -112,9 +110,12 @@ function onEvent(state: State, name: string, raw: unknown, at: number): State {
       const r = raw as Report
       const u = r.scores?.urgency
       let next = withSite(state, r.id, { id: r.id, report: r })
-      next = pushFeed(next, `ai& report: urgency ${u ?? '?'}/5${r.latency_ms ? ' · ' + ms(r.latency_ms) : ''}`, 'report', at)
-      const cur = next.selectedId ? next.sites[next.selectedId] : undefined
-      if (!next.selectedId || next.selectedId === r.id || !cur?.report) next = { ...next, selectedId: r.id }
+      next = pushFeed(
+        next,
+        r.brief_pending ? `Assessment: urgency ${u ?? '?'}/5 (rules)` : `ai& report: urgency ${u ?? '?'}/5${r.latency_ms ? ' · ' + ms(r.latency_ms) : ''}`,
+        'report',
+        at,
+      )
       return next
     }
     case 'summary': {

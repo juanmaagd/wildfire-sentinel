@@ -115,5 +115,7 @@ export function useRun() {
     dispatch({ type: 'lang', lang })
   }, [])
 
-  return { state, start, select, setLang, isMock: MOCK }
+  // Feed out-of-stream payloads (e.g. an on-demand ai& report) through the same reducer.
+  const ingest = useCallback((name: string, data: unknown) => dispatch({ type: 'event', name, data, at: now() }), [])
+  return { state, start, select, setLang, ingest, isMock: MOCK }
 }

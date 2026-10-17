@@ -12,7 +12,8 @@ import { useRun } from './useRun'
 import type { Focus, Site } from './types'
 
 export default function App() {
-  const { state, start, select, setLang, isMock } = useRun()
+  const { state, start, select, setLang, ingest, isMock } = useRun()
+  const [reportLoading, setReportLoading] = useState<string | null>(null)
   const [fly, setFly] = useState<Focus | null>(null)
   const [bad, setBad] = useState<Set<string>>(() => new Set())
   const [spreadOpen, setSpreadOpen] = useState(false)
@@ -67,6 +68,22 @@ export default function App() {
     select(id)
     const h = sites[id]?.hotspot
     if (h) setFly({ lat: h.lat, lon: h.lon, zoom: 13, nonce: Date.now() })
+  }
+
+  // ai& report on demand: only for the alert a user opens.
+  const requestReport = async (id: string) => {
+    setReportLoading(id)
+    try {
+      const res = await fetch(`/api/report/${encodeURIComponent(id)}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const d = await res.json()
+      if (d.probe) ingest('probe', d.probe)
+      ingest('report', d.report)
+    } catch (err) {
+      ingest('analysis_error', { id, message: `Report failed: ${(err as Error).message}` })
+    } finally {
+      setReportLoading(null)
+    }
   }
 
   const fuel = selected?.probe?.answers?.fuel_type as { value?: unknown } | undefined
@@ -170,6 +187,8 @@ export default function App() {
                 badImages={bad}
                 onBadImage={onBadImage}
                 onOpen3D={() => setSpreadOpen(true)}
+                onRequestReport={() => requestReport(selected.id)}
+                reportLoading={reportLoading === selected.id}
               />
             </div>
           </aside>

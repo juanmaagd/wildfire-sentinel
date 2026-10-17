@@ -57,6 +57,8 @@ export interface Report {
   latency_ms?: number
   generated_at?: string
   model?: string
+  brief_pending?: boolean
+  detected_at?: string
 }
 
 export interface Site {
