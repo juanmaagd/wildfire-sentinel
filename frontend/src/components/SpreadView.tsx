@@ -205,7 +205,9 @@ export default function SpreadView({ lat, lon, day, fuel, forceMock, onClose }: 
 
   return (
     <div className="fixed inset-0 z-50 bg-canvas">
-      <div ref={el} className="absolute inset-0" />
+      <div className="absolute inset-0">
+        <div ref={el} className="h-full w-full" />
+      </div>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-6">
         <div className="pointer-events-auto bg-canvas/80 backdrop-blur-sm px-5 py-4">

@@ -170,5 +170,10 @@ export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) 
     m.flyTo({ center: [fly.lon, fly.lat], zoom: fly.zoom, duration: 1200 })
   }, [fly])
 
-  return <div ref={el} className="absolute inset-0" aria-label="Hotspot map" />
+  // maplibre-gl.css forces `position: relative` on the map element, so positioning lives on a wrapper.
+  return (
+    <div className="absolute inset-0">
+      <div ref={el} className="h-full w-full" aria-label="Hotspot map" />
+    </div>
+  )
 }
