@@ -7,3 +7,8 @@ app/.cache/
 .pytest_cache/
 frontend/node_modules/
 frontend/dist/
+.claude/
+.agents/
+spike/images/
+.atl/
+skills-lock.json
