@@ -22,9 +22,9 @@ const BASE: StyleSpecification = {
       source: 'gsi',
       paint: {
         'raster-saturation': -0.95,
-        'raster-contrast': 0.25,
+        'raster-contrast': 0.1,
         'raster-brightness-min': 0.02,
-        'raster-brightness-max': 0.42,
+        'raster-brightness-max': 0.2,
       },
     },
   ],
@@ -167,7 +167,8 @@ export default function HotspotMap({ sites, selectedId, fly, onSelect }: Props) 
   useEffect(() => {
     const m = mapRef.current
     if (!fly || !m) return
-    m.flyTo({ center: [fly.lon, fly.lat], zoom: fly.zoom, duration: 1200 })
+    // Site zooms keep the point left of the 520 px detail drawer.
+    m.flyTo({ center: [fly.lon, fly.lat], zoom: fly.zoom, duration: 1200, offset: fly.zoom >= 13 ? [-260, 0] : [0, 0] })
   }, [fly])
 
   // maplibre-gl.css forces `position: relative` on the map element, so positioning lives on a wrapper.

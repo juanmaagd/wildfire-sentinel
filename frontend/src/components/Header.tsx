@@ -23,20 +23,20 @@ export default function Header({ status, statusText, mode, day, onStart, isMock 
   const tone =
     status === 'running' ? 'bg-lime animate-pulse' : status === 'error' ? 'bg-lime' : status === 'done' ? 'bg-lime/50' : 'bg-ash'
   return (
-    <header className="flex h-16 shrink-0 items-center gap-6 border-b border-iron bg-canvas px-6">
+    <header className="flex items-center gap-5 bg-canvas/85 px-4 py-3 backdrop-blur-sm">
       <div className="flex items-center gap-3">
-        <div className="flex size-9 items-center justify-center bg-lime">
+        <div className="flex size-8 items-center justify-center bg-lime">
           <span className="size-3 bg-canvas" />
         </div>
         <div className="leading-tight">
-          <div className="text-xl font-normal tracking-tight">Wildfire Sentinel</div>
+          <div className="text-lg font-normal tracking-tight">Wildfire Sentinel</div>
           <div className="font-mono text-xs uppercase tracking-[0.12em] text-ash">
             Disaster operations console{isMock ? ' · mock' : ''}
           </div>
         </div>
       </div>
 
-      <nav className="ml-4 flex gap-2" aria-label="Mode">
+      <nav className="flex gap-2" aria-label="Mode">
         {(['live', 'replay'] as const).map((m) => {
           const Icon = m === 'live' ? Radio : History
           const active = mode === m && status !== 'idle'
@@ -58,7 +58,7 @@ export default function Header({ status, statusText, mode, day, onStart, isMock 
         })}
       </nav>
 
-      <div className="ml-auto flex items-center gap-3 font-mono text-sm" role="status" aria-live="polite">
+      <div className="flex max-w-[360px] items-center gap-3 font-mono text-[12px]" role="status" aria-live="polite">
         <span className={`size-2.5 rounded-[3.6px] ${tone}`} />
         <span className="text-bone">{text}</span>
       </div>
