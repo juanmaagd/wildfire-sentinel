@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Awaitable, Callable
 
 from . import analyst, jev, memory, scoring, sources
-from .config import JAPAN_BBOX, OFUNATO_BBOX, REPLAY_DAYS, REPLAY_START
+from .config import JAPAN_BBOX, OFUNATO_BBOX, REPLAY_DAYS, REPLAY_SOURCES, REPLAY_START
 
 Emit = Callable[[str, dict], Awaitable[None]]
 
@@ -170,12 +170,15 @@ class Run:
             if self.mode == "replay":
                 await asyncio.to_thread(memory.forget_area, OFUNATO_BBOX)
                 start = date.fromisoformat(REPLAY_START)
+                end = (start + timedelta(days=REPLAY_DAYS - 1)).isoformat()
+                rain = await asyncio.to_thread(sources.daily_rain, 39.05, 141.8, REPLAY_START, end)
                 for i in range(REPLAY_DAYS):
                     day = (start + timedelta(days=i)).isoformat()
-                    await self.emit("day", {"date": day, "index": i + 1, "of": REPLAY_DAYS})
-                    rows = await asyncio.to_thread(sources.fetch_hotspots, OFUNATO_BBOX, 1, day)
+                    rows = await asyncio.to_thread(sources.fetch_hotspots_multi, OFUNATO_BBOX, 1, day, REPLAY_SOURCES)
+                    await self.emit("day", {"date": day, "index": i + 1, "of": REPLAY_DAYS,
+                                            "detections": len(rows), "rain_mm": round(rain.get(day, 0.0), 1)})
                     await self.batch(sources.cluster_hotspots(rows), mem, jv, day)
-                    await asyncio.sleep(2)  # pacing so the audience can follow day by day
+                    await asyncio.sleep(1.2)  # pacing so the audience can follow day by day
             else:
                 rows = await asyncio.to_thread(sources.fetch_hotspots, JAPAN_BBOX, 2)
                 await self.batch(sources.cluster_hotspots(rows), mem, jv, None)

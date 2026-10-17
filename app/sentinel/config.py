@@ -15,7 +15,9 @@ IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 JAPAN_BBOX = (128.0, 30.0, 146.0, 46.0)  # west, south, east, north
 OFUNATO_BBOX = (141.5, 38.9, 142.0, 39.2)
 REPLAY_START = "2025-02-26"
-REPLAY_DAYS = 4
+REPLAY_DAYS = 9  # 2025-02-26 → 03-06: ignition, growth, decline, extinguished by the 03-05 rain
+# Combining the three VIIRS satellites shows the whole fire lifecycle (NOAA-20 alone misses 03-02..03-04).
+REPLAY_SOURCES = ("VIIRS_NOAA20_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA21_NRT")
 
 LOCAL_NEO4J = {"uri": "bolt://localhost:7687", "username": "neo4j", "password": "wildfire-local-dev"}  # docker-compose.yml
 

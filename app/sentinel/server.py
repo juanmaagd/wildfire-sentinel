@@ -65,7 +65,7 @@ async def spread_prediction(lat: float, lon: float, day: str | None = None, fuel
     ctx = await asyncio.to_thread(spread.replay_context, lat, lon, day) if day else {}
     wx, hourly = await asyncio.gather(
         asyncio.to_thread(sources.weather, lat, lon, day),
-        asyncio.to_thread(sources.hourly_weather, lat, lon, day, 48, ctx.get("start_jst")),
+        asyncio.to_thread(sources.hourly_weather, lat, lon, day, 168, ctx.get("start_jst")),
     )
     result = await asyncio.to_thread(spread.simulate, lat, lon, hourly, wx["rain_7d_mm"], fuel, ctx.get("seeds"), ctx.get("observed"))
     if ctx:

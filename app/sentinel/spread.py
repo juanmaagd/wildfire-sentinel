@@ -19,8 +19,8 @@ from . import scoring
 
 TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 ZOOM, TILES, DOWNSAMPLE = 11, 3, 3
-HOURS = (3, 6, 12, 24, 48)
-SPEED = 0.35  # calibrated on the Ofunato replay (area vs. observed detections)
+HOURS = (3, 6, 12, 24, 48, 72, 96, 120, 168)
+SPEED = 0.20  # calibrated on the Ofunato replay: 7-day area ~1.9x real, 96% of later detections inside (cautious)
 VIIRS_TOLERANCE_CELLS = 2  # ~375 m VIIRS pixel ≈ 2 grid cells
 EARTH = 40075016.686
 
@@ -56,11 +56,17 @@ def _dem(lat: float, lon: float) -> tuple[np.ndarray, float, float, float]:
     return grid, cell_m, tx0 * 256.0, ty0 * 256.0
 
 
-def _hour_params(w: dict, fuel: float, rain_7d: float) -> tuple[float, float, float, float]:
+RAIN_STOP_MM = 2.0  # rain over the previous 24 h above this wets the fuel: spread nearly stops
+RAIN_FACTOR = 0.03
+
+
+def _hour_params(w: dict, fuel: float, rain_7d: float, rain_24h: float = 0.0) -> tuple[float, float, float, float]:
     """(head ROS m/min, wind-to east, wind-to north, ellipse eccentricity) for one hour of weather."""
     dryness = 0.5 * min(1, max(0, (70 - w["humidity_pct"]) / 45)) + 0.5 * min(1, max(0, (15 - rain_7d) / 15))
     wind = w["wind_speed_ms"]
     r_head = (1.0 + 6.0 * fuel * dryness) * (1 + 0.3 * wind)
+    if rain_24h >= RAIN_STOP_MM or (w.get("precip_mm") or 0) >= 0.5:
+        r_head *= RAIN_FACTOR
     to = math.radians((w["wind_from_deg"] + 180) % 360)
     mph = wind * 2.237
     lb = min(3.5, max(1.0, 0.936 * math.exp(0.2566 * mph) + 0.461 * math.exp(-0.1548 * mph) - 0.397))
@@ -77,7 +83,8 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
     ign = (int((py - oy) / DOWNSAMPLE), int((px - ox) / DOWNSAMPLE))
 
     fuel = scoring.FUEL.get(fuel_type, 0.7)
-    params = [_hour_params(w, fuel, rain_7d) for w in hourly] or [_hour_params(
+    rain_24h = [sum((x.get("precip_mm") or 0) for x in hourly[max(0, i - 24): i + 1]) for i in range(len(hourly))]
+    params = [_hour_params(w, fuel, rain_7d, rain_24h[i]) for i, w in enumerate(hourly)] or [_hour_params(
         {"humidity_pct": 50, "wind_speed_ms": 3, "wind_from_deg": 270}, fuel, rain_7d)]
     params = [(p[0] * speed, *p[1:]) for p in params]
 
@@ -144,6 +151,11 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
             i = int(np.argmax(proj))
             head.append(to_lonlat(rows[i], cols[i]))
 
+    rain_by_horizon, prev = {}, 0
+    for h in HOURS:
+        rain_by_horizon[str(h)] = round(sum((x.get("precip_mm") or 0) for x in hourly[prev:h]), 1)
+        prev = h
+
     # Prediction vs reality: was each later satellite detection inside the predicted burn area by then?
     hits = {}
     if observed:
@@ -169,6 +181,7 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
         "hours": list(HOURS),
         "perimeters": {"type": "FeatureCollection", "features": features},
         "head_path": {"type": "Feature", "properties": {}, "geometry": {"type": "LineString", "coordinates": head}},
+        "rain_by_horizon": rain_by_horizon,
         "stats": {"area_ha": areas, "max_ros_m_min": round(max(p[0] for p in params) * 2, 1),
                   "head_direction_deg": round((w0["wind_from_deg"] + 180) % 360), "cell_m": round(cell_m),
                   "fuel": fuel_type, "weather_hours": len(hourly)},
@@ -181,9 +194,12 @@ def replay_context(lat: float, lon: float, day: str, span: float = 0.2) -> dict:
     """What the satellite saw: the first pass on `day` (seeds, t=0) and every later detection within 48 h."""
     from datetime import datetime, timedelta, timezone
 
-    from .sources import fetch_hotspots
+    from .config import REPLAY_SOURCES
+    from .sources import fetch_hotspots_multi
 
-    rows = fetch_hotspots((lon - span, lat - span, lon + span, lat + span), 3, on_date=day)
+    bbox = (lon - span, lat - span, lon + span, lat + span)
+    second = (datetime.fromisoformat(day) + timedelta(days=5)).date().isoformat()
+    rows = fetch_hotspots_multi(bbox, 5, day, REPLAY_SOURCES) + fetch_hotspots_multi(bbox, 4, second, REPLAY_SOURCES)
     for r in rows:
         r["when"] = datetime.strptime(f"{r['acq_date']} {int(r['acq_time']):04d}", "%Y-%m-%d %H%M").replace(tzinfo=timezone.utc)
     if not rows:
