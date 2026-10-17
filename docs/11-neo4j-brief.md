@@ -43,3 +43,9 @@ Resources: https://graphacademy.neo4j.com/ · https://neo4j.com/developer/ · ht
 | 12:xx | Agent Memory | Worked | `search_locations_near` + reasoning traces with `record_tool_call` map perfectly to "remember past verdicts"; pass 2 skipped every model call |
 | 12:xx | Agent Memory | Confusing | `MemorySettings.embedding`/`llm` are typed `Any`, so valid providers had to be discovered via `EmbeddingProvider` enum; `LLMConfig` has no `base_url`, so OpenAI-compatible providers (ai&) can't be plugged in directly |
 | 12:xx | Agent Memory | Confusing | Startup logs warn about missing GLiNER/LLM extractors even when extraction isn't used |
+| 13:xx | Agent Memory | Blocked → worked around | Concurrent `add_entity` calls deadlock in Neo4j (dedup locks); we serialize memory writes behind one lock |
+| 13:xx | Agent Memory | Blocked → worked around | First run hung: the sentence-transformers model loads lazily from 8 concurrent calls; warm it up once at startup (and `HF_HUB_OFFLINE=1`) |
+| 13:xx | Agent Memory | Confusing | No API to forget entities in an area; we use the driver with Cypher on `e.location` |
+| 15:xx | Neo4j 5.26 Cypher | Worked | `CALL (b) { ... ORDER BY point.distance(...) LIMIT 1 }` builds every `SPREAD_TO` link of a fire in one query; `point.distance` also joins our graph to Agent Memory's Location entities |
+| 15:xx | Agent Memory + own graph | Worked | Agent Memory and our propagation graph share one database, so a detection links straight to the site Jev judged (`SEEN_AT`) |
+| 15:xx | NVL 2.0 (`@neo4j-nvl/react`) | Confusing | `layout` is no longer an `InteractiveNvlWrapper` prop (it goes in `nvlOptions`) and wheel zoom is `onZoomAndPan`, while several docs examples still show the old shape; the Vite production build with web-worker layout worked first time |

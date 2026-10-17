@@ -13,9 +13,12 @@ Satellite hotspot feeds are noisy. Most detections over Japan come from industri
 3. **Stage 1, Jev sentinel**: one cheap request per hotspot on the GSI aerial photo. It asks about industrial facilities within about 400 m, vegetation, and houses. A possible fire is alerted immediately.
 4. **Stage 2, Jev deep probe**: only for alerted hotspots. Several images and many questions run in parallel (fuel, vegetation continuity, settlement direction, firebreaks, smoke, and similar).
 5. **Rule-based scoring** combines Jev answers, weather (Open-Meteo wind, humidity, days without rain) and FIRMS (FRP, detections, trend) into danger, spread risk, exposure and urgency. The weights are in code.
-6. **ai& report**: writes the headline, brief (JA/EN), confidence, key evidence and unknowns from the structured findings. Times and numbers come from code, never from the model.
+6. **ai& report** (on demand): writes the headline, brief (JA/EN), confidence, key evidence and unknowns from the structured findings. Times and numbers come from code, never from the model.
 7. **Neo4j memory** stores each site, each verdict as a reasoning trace, and the detection history.
-8. **Map UI** shows hotspots colored by verdict. Clicking one shows photos, probe answers, scores, the memory trace and the report.
+8. **Map UI** groups detections into fire incidents (active or extinguished). Clicking one shows photos, probe answers, scores, the memory trace and the report.
+9. **3D spread prediction**: an elliptical wind-slope model on a terrain grid (AWS terrarium DEM, ~180 m cells) with hourly Open-Meteo weather for 7 days. Rain stalls the spread; the sea does not burn. In replay it starts from the first satellite pass and is scored against the later detections.
+10. **Response plan** (on demand, at any hour of the timeline): a control line on the fire's front three hours later (crew lead time), re-simulated as a fuel break, with line length and crews needed. ai& writes the tactics from those numbers. Plans stay on the timeline as P1, P2… to compare decision times.
+11. **Fire graph**: the incident is written to Neo4j as a propagation graph (`Detection -[:SPREAD_TO]-> Detection`, days, links to memory sites). Ignition, longest path, key spreading point and new fronts are Cypher queries, shown with NVL.
 
 Recommended actions are rule-based. For example, evacuation advice appears only when houses are within reach and danger is 4 or higher.
 
@@ -24,11 +27,13 @@ Recommended actions are rule-based. For example, evacuation advice appears only 
 **ai&** (OpenAI-compatible API at `https://api.aiand.com/v1`)
 - `deepseek-ai/deepseek-v4-flash` writes the situation report with a strict JSON schema.
 - `zai-org/glm-5.3-flash` is the vision model. It was verified in the spike but is not on the main path.
-- The report takes about 5–11 s per alert.
+- The report takes about 5–11 s per alert; the tactical response plan about 6–7 s.
 
 **Neo4j** (neo4j-agent-memory 0.7.0)
 - Each verdict is a reasoning trace with its tool calls recorded.
 - Sites are `LOCATION` entities with coordinates. `search_locations_near` lets the pipeline skip known industrial sites.
+- Each fire is also a propagation graph written with plain Cypher in the same database; detections link to the Agent Memory sites Jev judged.
+- The fire graph is rendered in the app with NVL (`@neo4j-nvl/react`).
 - Local Neo4j 5.26 runs in Docker. Aura can be used through environment variables.
 
 **TypeSafe Jev** (not a sponsor tool) is the fast System One model used for stage 1 and stage 2. Spike model: `jev-1.14.0`.
@@ -43,7 +48,9 @@ Recommended actions are rule-based. For example, evacuation advice appears only 
 | Jev deep probe, 11 questions across 3 images | 190–530 ms | end-to-end replay run |
 | Live run, share filtered as industrial | 77% (55 of 71 sites) | `docs/12-product-design.md` |
 | ai& situation report | 5–11 s (text model; vision model was 20–47 s) | end-to-end run, `odd/tasks/wildfire-sentinel.md` |
-| Ofunato replay (2025-02-26 to 03-01) | 48 hotspots, 37 Jev calls, 3–4 ai& reports, about 23 s | end-to-end run, `odd/tasks/wildfire-sentinel.md` |
+| Drill alert (Ashikaga brush fire) | alert 0.6 s, full analysis 3.3 s | end-to-end run |
+| Spread prediction vs later VIIRS detections (Ofunato) | ~48% inside at +48 h, 85–96% at +120–168 h; area ~1.9× real | replay, `app/sentinel/spread.py` |
+| Fire graph (Ofunato, 9 days) | 255 detections, 227 SPREAD_TO links, built in ~8 s | `app/sentinel/graph.py` |
 | Memory, second pass over the same area | 100% memory hits, 0 Jev calls | spike, `docs/10-integrations.md` |
 
 ## Run it
@@ -66,8 +73,11 @@ cd app && uv run uvicorn sentinel.server:app --port 8000
 ```
 
 Open http://localhost:8000 and choose a mode:
-- **Live · today** runs on today's FIRMS data.
-- **Replay · Ofunato 2025** runs on the FIRMS archive for 2025-02-26 to 2025-03-01.
+- **Live** runs on today's FIRMS data.
+- **Drill · Ashikaga** raises one everyday brush-fire alert on the slope above central Ashikaga and runs it on today's weather forecast.
+- **Replay · Ofunato** runs the 2025 Ofunato fire from the FIRMS archive (three VIIRS satellites, 2025-02-26 to 03-06, ignition to extinction).
+
+The React UI is built with `cd frontend && npm install && npm run build`; the server serves `frontend/dist`, or the plain `web/` UI if there is no build.
 
 Mock UI, without the backend: serve `web/` and open `index.html?mock=1`.
 
@@ -108,5 +118,7 @@ docker-compose.yml local Neo4j 5.26 with APOC
 - VIIRS geolocation is about 375 m, so the pipeline asks about industrial sites within about 400 m of the hotspot rather than at its exact center.
 - Images in Jev are a beta feature.
 - Scores come from heuristic rules and are not calibrated against real fire outcomes.
+- The spread model is a simple elliptical wind-slope model calibrated on one fire (Ofunato). The response plan does not know roads or rivers; crew counts use typical line production rates.
+- Drill is a simulated alert at a real place, labelled as a drill in the UI.
 - Memory uses a local sentence-transformers embedding model, because ai& has no embeddings endpoint.
 - The Aura Free instance auto-pauses after 72 hours of inactivity.
