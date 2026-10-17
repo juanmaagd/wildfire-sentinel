@@ -207,13 +207,20 @@ El modelo calcula, para **cada celda del terreno**, **cuánto tarda el fuego en 
 
 ### ¿Funciona? La comprobación con la realidad (Replay)
 
-En Ofunato arrancamos la predicción con el primer pase del satélite y la comparamos con lo que **los satélites vieron después** ("Satellite check"):
+En Ofunato arrancamos la predicción con el primer pase del satélite (27/02, 00:52) y la comparamos con la **superficie quemada oficial** en los mismos momentos (panel **"Reality check"** de la vista 3D):
 
-- a las +48 h, ~48 % de las detecciones reales cae dentro de lo predicho;
-- a las +120–168 h, entre 85 % y 96 %;
-- el área total predicha es ~1,9 veces la real: el modelo es **prudente** (prefiere sobreestimar).
+| Momento | Oficial | Predicción |
+| --- | --- | --- |
+| +30 h (28/02 a la mañana, NHK) | 1.200 ha | **1.139 ha (−5 %)** |
+| 03/03 (Yomiuri) | 2.100 ha | ~2× |
+| 05/03 6:00 (Iwate) | 2.900 ha | ~1,8× |
+| Final (ciudad de Ofunato) | 3.370 ha | 1,65× |
 
-La velocidad del modelo (`SPEED = 0,20`) se **calibró con Ofunato**, así que esto es un ajuste, no una validación independiente. Es un modelo simple, no un simulador profesional como FARSITE.
+- **El dato para mostrar:** a las 30 horas la predicción acierta el tamaño con un 5 % de error.
+- **Después sobreestima** (hasta el doble) porque el modelo **no simula a los bomberos** apagando el fuego. Lo mostramos igual: es más creíble.
+- **94 % de las 232 detecciones satelitales posteriores** caen dentro de la zona predicha, pero **un círculo del mismo tamaño también contiene el 94 %**. No hay que vender que acertamos la forma: lo que valida es el tamaño en las primeras 30 h.
+- La velocidad del modelo (`SPEED = 0,20`) se **calibró con Ofunato**, así que es un ajuste, no una validación independiente. Es un modelo simple, no un simulador profesional como FARSITE.
+- En el Replay se usa el combustible con el que se calibró (bosque de coníferas). La foto de un solo punto no representa un incendio de 3.000 ha.
 
 ---
 

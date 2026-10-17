@@ -23,6 +23,14 @@ REPLAY_SOURCES = ("VIIRS_NOAA20_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA21_NRT")
 # central Ashikaga (site of the 2021 Mt. Ryogai fire), run with today's live weather forecast.
 DRILL = {"lat": 36.3427, "lon": 139.4462, "frp": 8.5, "detections": 2, "place": "Ashikaga · Mt. Ryogai foothills"}
 
+# Official burned area of the Ofunato fire (JST), to check the replay prediction against reality.
+OFUNATO_OFFICIAL = [
+    ("2025-02-28T06:00", 1200, "NHK, Feb 28 morning"),
+    ("2025-03-03T12:00", 2100, "Yomiuri, Mar 3"),
+    ("2025-03-05T06:00", 2900, "Iwate Prefecture, Mar 5 6:00"),
+    (None, 3370, "Ofunato City final survey"),  # compared with the last prediction horizon
+]
+
 LOCAL_NEO4J = {"uri": "bolt://localhost:7687", "username": "neo4j", "password": "wildfire-local-dev"}  # docker-compose.yml
 
 

@@ -4,6 +4,7 @@ import { Map as MLMap, type GeoJSONSource, type StyleSpecification } from 'mapli
 import { Clapperboard, Pause, Play, X } from 'lucide-react'
 import { humanize } from '../lib/format'
 import WeatherTimeline, { type HourWeather } from './WeatherTimeline'
+import RealityCheck, { type RealityPoint } from './RealityCheck'
 
 export interface SpreadData {
   ignition: { lat: number; lon: number }
@@ -20,6 +21,7 @@ export interface SpreadData {
   start?: string
   weather_hourly?: HourWeather[]
   rain_by_horizon?: Record<string, number>
+  reality?: RealityPoint[] // replay only: predicted vs official burned area
 }
 export interface Tactic { name: string; when: string; where: string; resources: string; why: string }
 export interface PlanData {
@@ -469,6 +471,9 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, forceMock, onC
             <div className="mt-3 font-mono text-[13px] uppercase tracking-wider tabular-nums text-lime">
               Wind {wind.speed_ms.toFixed(1)} m/s from {compass(wind.from_deg)} · gusts {wind.gust_ms.toFixed(1)}
             </div>
+          )}
+          {data?.reality && data.reality.length > 0 && !(plan && showPlan) && (
+            <RealityCheck points={data.reality} areaByHour={data.stats.area_ha} hour={hour} />
           )}
         </div>
         <button

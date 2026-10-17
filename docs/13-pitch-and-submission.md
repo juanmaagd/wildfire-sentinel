@@ -45,7 +45,9 @@ Spoken lines are plain text. Stage directions are in [brackets]. Drill numbers c
 
 [Open the incident → 3D prediction → slide to +120 h. Point at "Satellite check".]
 
-"We seed the model with the first satellite pass and compare it with what the satellites saw later: [read: x/y real detections inside the prediction]."
+"We seed the model with the first satellite pass and check it against reality. Thirty hours later it predicted about 1,140 hectares; the official figure was 1,200. After that it over-predicts, because the model has no firefighters, and we show that too."
+
+[Point at the Reality check panel: the orange curve against the official dots.]
 
 [Back → "Fire graph · Neo4j". Click "Key spreading point", then "New fronts".]
 
@@ -88,7 +90,7 @@ Judges from `docs/05`. Their interests are inferred, not confirmed.
    Two relational questions. First, memory: what do we already know within about 400 m of this point? Sites are agent-memory Location entities linked to their reasoning traces; the spike's second pass gave 100% memory hits and zero Jev calls. Second, propagation: every Ofunato detection is linked with `SPREAD_TO` to the nearest detection of an earlier satellite pass (≤ 2 km, ≤ 48 h). Root nodes, longest path, the hub with the most descendants and new fronts are Cypher queries on that graph, not hand-written analysis. Measured on Ofunato: 255 detections, 227 spread links, longest path 8 hops / 4.5 km / 119 h, one hub with 82 descendants, 2 new fronts (+49 h, +131 h).
 
 8. **How do you know the spread prediction is right?**
-   Replay seeds the model with the first satellite pass and checks later VIIRS detections against the predicted area (tolerance 2 cells, about 375 m). On Ofunato: about 48% of detections at +48 h and 85–96% at +120–168 h fall inside; total area is about 1.9× the real fire, so the model is cautious. It is a simple elliptical wind-slope model on a 180 m grid, not FARSITE.
+   Replay seeds the model with the first satellite pass (2025-02-27 00:52 JST) and compares the predicted burned area with official figures at the same moments: +30 h 1,139 ha predicted vs 1,200 ha (NHK, Feb 28 morning), −5%. Later it over-predicts (×1.9–2.0 by Mar 3–5, ×1.65 vs the final 3,370 ha), because the model has no firefighting. 94% of the 232 later VIIRS detections fall inside the 7-day predicted area, **but a circle of the same area also contains 94%**, so do not claim the model gets the shape right; what validates is the size in the first 30 h. `SPEED` was calibrated on this same fire, so this is a fit, not an independent test. It is a simple elliptical wind-slope model on a 180 m grid, not FARSITE.
 
 9. **Is the response plan realistic?**
    The control line follows the fire's isochrone three hours after the decision (crew lead time), on the head and flanks, or the whole perimeter when the forecast has a wind shift of 60° or more. Crew counts use typical line production rates (hand crew 0.3 km/h, bulldozer 1 km/h). ai& writes the tactics only from those numbers. Roads and rivers are not in the model yet.

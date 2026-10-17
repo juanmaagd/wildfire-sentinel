@@ -251,7 +251,9 @@ export default function App() {
           lat={spreadFrom.lat}
           lon={spreadFrom.lon}
           day={spreadFrom.day}
-          fuel={fuelValue}
+          // Replay: the model was calibrated on the whole Ofunato incident with its default fuel; one site's photo
+          // does not represent a 3,000 ha fire. Drill/live: the Jev fuel of the alerted site.
+          fuel={replay ? undefined : fuelValue}
           siteId={selected.id}
           forceMock={isMock}
           onClose={() => setSpreadOpen(false)}

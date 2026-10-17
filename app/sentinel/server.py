@@ -1,6 +1,7 @@
 """FastAPI: SSE run endpoint, cached images, static map UI."""
 
 import asyncio
+from datetime import datetime
 import json
 import os
 import traceback
@@ -14,7 +15,7 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 
 from . import analyst, graph, memory, sources, spread, video
-from .config import IMAGES_DIR, ROOT
+from .config import IMAGES_DIR, OFUNATO_BBOX, OFUNATO_OFFICIAL, ROOT
 from .pipeline import ASSESSED, HOTSPOTS, Run, report_on_demand
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # embedding model is cached locally; don't hit the HF Hub per run
@@ -59,6 +60,19 @@ async def run(mode: str = "live") -> AsyncIterable[ServerSentEvent]:
         task.cancel()
 
 
+def _official_points(lat: float, lon: float, start_jst: str | None) -> list[dict]:
+    west, south, east, north = OFUNATO_BBOX
+    if not start_jst or not (west <= lon <= east and south <= lat <= north):
+        return []
+    t0 = datetime.fromisoformat(start_jst)
+    out = []
+    for when, ha, source in OFUNATO_OFFICIAL:
+        hours = max(spread.HOURS) if when is None else round((datetime.fromisoformat(when) - t0).total_seconds() / 3600, 1)
+        if 0 < hours <= max(spread.HOURS):
+            out.append({"time": when, "hours": hours, "official_ha": ha, "source": source})
+    return out
+
+
 @app.get("/api/spread")
 async def spread_prediction(lat: float, lon: float, day: str | None = None, fuel: str = "conifer_forest") -> dict:
     # Replay: start from everything the satellite saw on its first pass, and overlay what it saw afterwards.
@@ -67,7 +81,11 @@ async def spread_prediction(lat: float, lon: float, day: str | None = None, fuel
         asyncio.to_thread(sources.weather, lat, lon, day),
         asyncio.to_thread(sources.hourly_weather, lat, lon, day, 168, ctx.get("start_jst")),
     )
-    result = await asyncio.to_thread(spread.simulate, lat, lon, hourly, wx["rain_7d_mm"], fuel, ctx.get("seeds"), ctx.get("observed"))
+    official = _official_points(lat, lon, ctx.get("start_jst"))
+    result = await asyncio.to_thread(spread.simulate, lat, lon, hourly, wx["rain_7d_mm"], fuel, ctx.get("seeds"),
+                                     ctx.get("observed"), spread.SPEED, [p["hours"] for p in official])
+    if official:  # reality check: predicted vs official burned area at the same moments
+        result["reality"] = [{**p, "predicted_ha": result["area_at"][str(p["hours"])]} for p in official]
     if ctx:
         result["observed"] = ctx["observed"]
         result["start"] = ctx.get("start_label")

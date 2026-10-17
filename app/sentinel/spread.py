@@ -158,8 +158,10 @@ def _perimeters(T: np.ndarray, ctx: dict, to_lonlat) -> tuple[list, dict]:
 
 
 def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str = "conifer_forest",
-             seeds: list[tuple[float, float]] | None = None, observed: dict | None = None, speed: float = SPEED) -> dict:
-    """`seeds`: every burning point seen at t=0 (multi-point ignition); defaults to the alert location."""
+             seeds: list[tuple[float, float]] | None = None, observed: dict | None = None, speed: float = SPEED,
+             checkpoints: list[float] | None = None) -> dict:
+    """`seeds`: every burning point seen at t=0 (multi-point ignition); defaults to the alert location.
+    `checkpoints`: extra hours whose predicted area is returned in `area_at` (to compare with official figures)."""
     started = time.perf_counter()
     ctx = _prepare(lat, lon, hourly, rain_7d, fuel_type, seeds, speed)
     dem, cell_m, ox, oy, ign, params, starts = (ctx[k] for k in ("dem", "cell_m", "ox", "oy", "ign", "params", "starts"))
@@ -171,6 +173,8 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
     head = [to_lonlat(*ign)]
     seed_points = [to_lonlat(*c) for c in starts]
     features, areas = _perimeters(T, ctx, to_lonlat)
+    cell_ha = cell_m * cell_m / 1e4
+    area_at = {str(h): round(float((T <= 60 * h).sum()) * cell_ha, 1) for h in checkpoints or []}
     for h in range(1, max(HOURS) + 1, 2):
         rows, cols = np.nonzero(T <= 60 * h)
         if len(rows):
@@ -209,6 +213,7 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
         "perimeters": {"type": "FeatureCollection", "features": features},
         "head_path": {"type": "Feature", "properties": {}, "geometry": {"type": "LineString", "coordinates": head}},
         "rain_by_horizon": rain_by_horizon,
+        "area_at": area_at,
         "stats": {"area_ha": areas, "max_ros_m_min": round(max(p[0] for p in params) * 2, 1),
                   "head_direction_deg": round((w0["wind_from_deg"] + 180) % 360), "cell_m": round(cell_m),
                   "fuel": fuel_type, "weather_hours": len(hourly)},
