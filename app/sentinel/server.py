@@ -34,6 +34,9 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Wildfire Sentinel", lifespan=lifespan)
 
 
+MAX_SPAN_DEG = 5.0  # ~500 km: a search covers a region, not a continent (same limit as the map button)
+
+
 def _run_args(mode: str = "live", bbox: str | None = None) -> tuple[str, tuple[float, float, float, float]]:
     """Validated before the stream opens: an HTTPException inside the SSE generator would arrive as a 200."""
     if mode not in ("live", "replay", "drill"):
@@ -47,6 +50,8 @@ def _run_args(mode: str = "live", bbox: str | None = None) -> tuple[str, tuple[f
     area = (max(w, -180.0), max(s, -90.0), min(e, 180.0), min(n, 90.0))
     if area[0] >= area[2] or area[1] >= area[3]:
         raise HTTPException(400, "bbox is empty")
+    if area[2] - area[0] > MAX_SPAN_DEG or area[3] - area[1] > MAX_SPAN_DEG:
+        raise HTTPException(400, f"bbox is wider than {MAX_SPAN_DEG}°: zoom in")
     return mode, area
 
 

@@ -8,6 +8,7 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - S5 — "no haga nuevas peticiones al mover, debe darle a un boton para volver a analizar sobre una zona como lo hace maps"; "La vista por defecto es tu ubicación debemos pedir permisos y tal, sino la vista dafault EEUU"; "botom de mi ubicacion".
 - S4 — "las fechas ... deben enseñarse con el formato y depende donde está el usuario" (viewer's locale and time zone). Report language per region: pending.
 - S6 — "solo japon lo veo bien definido en el mapa como que los demas paises no me cargan": detailed basemap worldwide.
+- S7 — "deberiamos limitar le numero de alertas o que no sea en un espacio tan wide porque ... estamos haciendo deep analysis sobre todas y no es bajo demanda".
 
 ## Tasks
 - T1 S1 inline — provider-agnostic `aerial_mosaic` (auto = GSI then Esri), `ESRI_API_KEY` optional; spike `spike/provider_compare.py`. Done.
@@ -16,6 +17,7 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - T4 S4 inline — Intl formatters in the browser's locale/zone; naive JST forecast times pinned to +09:00. Done (ai& report text still quotes JST).
 - T6 S6 inline — 2D basemap → OpenFreeMap dark (OSM vector, local labels). Done.
 - T5 S5 inline — "Search this area" on the map (only after a move, hidden while running; Live left the header), geolocation on load (zoom 8) with USA fallback, "My location" button. Done.
+- T7 S7 inline — search area ≤5° (button "Zoom in to search", server 400); live auto deep-probes only the 10 strongest alerts, the rest on open. Done.
 
 ## Log
 - L1 (2026-10-18) "Ahora tenemos que desplegarlo, pero antes me gustaria a no solo limitarlo a japon sino worldwide a ser posible"
@@ -27,3 +29,4 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - L7 (2026-10-20) User: "No puedo registrarme en ESRI, no funciona el signup" — production imagery key pending.
 - L8 (2026-10-20) S5 request. Verified headless: location granted flies to Lisbon, denied stays on USA, Search this area runs live on the view and hides while running.
 - L9 (2026-10-20) S4 + S6 requests. Verified headless with es-AR / America/Argentina/Buenos_Aires: "26 feb 2025, 1:14 p. m. ART"; Lisbon and Ofunato basemaps detailed.
+- L10 (2026-10-20) S7. Live 5° box in Zambia: 150 triaged (1,659 weaker skipped), 10 probes automatic, 138 on demand, 77 s (was 226 s with all probes); 15° box → 400.

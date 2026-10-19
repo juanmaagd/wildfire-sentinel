@@ -91,6 +91,7 @@ async def report_on_demand(hotspot_id: str) -> dict:
     return {"probe": cached["probe"], "report": report}
 PROBE_CONCURRENCY = 4  # every alert gets the deep probe; GSI/GIBS/Open-Meteo are public, so keep it gentle
 LIVE_MAX = 150  # live "this view": a wide view (a continent) has thousands of hotspots; triage the strongest
+AUTO_PROBE = 10  # live: only the strongest alerts get the deep probe right away; the rest run when opened (/api/probe)
 JEV_CONCURRENCY = 8
 
 
@@ -170,7 +171,11 @@ class Run:
         total = sum(h.detections for h in hotspots)
         # Alerts are already on the map; deep analysis runs in the background (strongest first) so the next batch
         # isn't blocked.
-        for h in sorted(alerts, key=lambda a: a.frp, reverse=True):
+        ranked = sorted(alerts, key=lambda a: a.frp, reverse=True)
+        if self.mode == "live":
+            self.stats["probe_on_demand"] = self.stats.get("probe_on_demand", 0) + max(0, len(ranked) - AUTO_PROBE)
+            ranked = ranked[:AUTO_PROBE]
+        for h in ranked:
             detections = total if self.mode == "replay" else h.detections
             self.background.append(asyncio.create_task(self._analyse_safe(h, mem, jv, day, detections)))
 

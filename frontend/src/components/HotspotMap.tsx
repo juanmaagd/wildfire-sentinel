@@ -12,6 +12,7 @@ export type VerdictFilter = 'all' | 'fires' | 'nonfire'
 const BASE = 'https://tiles.openfreemap.org/styles/dark'
 
 const USA: [[number, number], [number, number]] = [[-125, 24], [-66, 50]] // default view when location is unavailable
+const MAX_SPAN_DEG = 5 // ~500 km; the server rejects wider searches
 const LOCAL_ZOOM = 8 // ~150 km across: a region small enough that every hotspot in it gets analysed
 const EMPTY = { type: 'FeatureCollection' as const, features: [] as Feature[] }
 
@@ -79,6 +80,7 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
   // Moving the map never fetches hotspots: it only offers "Search this area", like a maps app.
   const [moved, setMoved] = useState(true) // offered on first load too (location denied keeps the default view)
   const [locating, setLocating] = useState(false)
+  const [tooWide, setTooWide] = useState(false)
 
   const pushData = () => {
     const m = mapRef.current
@@ -104,9 +106,17 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
     })
     mapRef.current = map
 
-    map.on('moveend', () => setMoved(true))
+    const checkSpan = () => {
+      const b = map.getBounds()
+      setTooWide(b.getEast() - b.getWest() > MAX_SPAN_DEG || b.getNorth() - b.getSouth() > MAX_SPAN_DEG)
+    }
+    map.on('moveend', () => {
+      setMoved(true)
+      checkSpan()
+    })
 
     map.on('load', () => {
+      checkSpan()
       locate(map)
       map.addSource('hot', { type: 'geojson', data: EMPTY })
       map.addSource('inc', { type: 'geojson', data: EMPTY })
@@ -238,10 +248,11 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
         <button
           type="button"
           onClick={analyze}
-          className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-2 bg-lime px-4 py-2 font-mono text-[12px] uppercase tracking-wider text-canvas shadow-lg hover:brightness-110"
+          disabled={tooWide}
+          className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-2 bg-lime px-4 py-2 font-mono text-[12px] uppercase tracking-wider text-canvas shadow-lg hover:brightness-110 disabled:bg-iron disabled:text-ash disabled:hover:brightness-100"
         >
           <Search className="size-4" aria-hidden />
-          Search this area
+          {tooWide ? 'Zoom in to search' : 'Search this area'}
         </button>
       )}
       <button

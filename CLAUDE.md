@@ -15,7 +15,7 @@ docker compose up -d                                   # local Neo4j 5.26 (neo4j
 cd app && uv run uvicorn sentinel.server:app --port 8000   # backend + UI at http://localhost:8000
 cd app && uv run pytest                                # scoring rules tests
 cd app && uv run pytest tests/test_scoring.py::test_urgency_rises_as_detections_accumulate   # single test
-curl -sN "http://localhost:8000/api/run?mode=replay"   # raw SSE stream (mode=live|replay|drill; live takes &bbox=w,s,e,n, default Japan)
+curl -sN "http://localhost:8000/api/run?mode=replay"   # raw SSE stream (mode=live|replay|drill; live takes &bbox=w,s,e,n ≤5° wide, default Japan; 150 strongest triaged, 10 auto deep probes, rest on open)
 ```
 
 ```bash
