@@ -199,8 +199,11 @@ def hourly_weather(lat: float, lon: float, day: str | None, hours: int = 168, st
               "hourly": "relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation"}
     if day:
         day0 = date.fromisoformat(day)
-        resp = httpx.get("https://archive-api.open-meteo.com/v1/archive", timeout=30, params={
-            **params, "start_date": day, "end_date": (day0 + timedelta(days=hours // 24 + 2)).isoformat()})
+        end = day0 + timedelta(days=hours // 24 + 2)
+        # The archive lags ~5 days and rejects future dates; a recent fire reads the forecast API, which also
+        # serves the last ~3 months.
+        api = "archive-api.open-meteo.com/v1/archive" if end < date.today() - timedelta(days=5) else "api.open-meteo.com/v1/forecast"
+        resp = httpx.get(f"https://{api}", timeout=30, params={**params, "start_date": day, "end_date": end.isoformat()})
         first = start or f"{day}T14:00"
     else:
         resp = httpx.get("https://api.open-meteo.com/v1/forecast", timeout=30, params={**params, "forecast_days": hours // 24 + 2})
