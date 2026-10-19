@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection } from 'geojson'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { LocateFixed, Search } from 'lucide-react'
 import { Map as MLMap, type GeoJSONSource, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl'
 import type { Focus, Site } from '../types'
 import type { Incident } from '../lib/incidents'
@@ -52,7 +53,8 @@ const BASE: StyleSpecification = {
   ],
 }
 
-const JAPAN: [[number, number], [number, number]] = [[127, 29.5], [146.5, 46]]
+const USA: [[number, number], [number, number]] = [[-125, 24], [-66, 50]] // default view when location is unavailable
+const LOCAL_ZOOM = 8 // ~150 km across: a region small enough that every hotspot in it gets analysed
 const EMPTY = { type: 'FeatureCollection' as const, features: [] as Feature[] }
 
 export function toGeoJSON(sites: Record<string, Site>): FeatureCollection {
@@ -83,7 +85,8 @@ interface Props {
   selectedId: string | null
   fly: Focus | null
   onSelect: (id: string) => void
-  onView: (bbox: string) => void // current view as "west,south,east,north": live analyses what is on screen
+  onAnalyze: (bbox: string) => void // "west,south,east,north" of the current view
+  busy: boolean // a run is in progress: hide "Search this area"
 }
 
 const incidentGeo = (incidents: Incident[]): FeatureCollection => ({
@@ -100,7 +103,7 @@ const DOT_FILTER = {
   nonfire: ['!=', ['get', 'verdict'], 'possible_fire'],
 } as const
 
-export default function HotspotMap({ sites, incidents, filter, selectedId, fly, onSelect, onView }: Props) {
+export default function HotspotMap({ sites, incidents, filter, selectedId, fly, onSelect, onAnalyze, busy }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const loaded = useRef(false)
@@ -115,8 +118,9 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
   selRef.current = selectedId
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
-  const onViewRef = useRef(onView)
-  onViewRef.current = onView
+  // Moving the map never fetches hotspots: it only offers "Search this area", like a maps app.
+  const [moved, setMoved] = useState(true) // offered on first load too (location denied keeps the default view)
+  const [locating, setLocating] = useState(false)
 
   const pushData = () => {
     const m = mapRef.current
@@ -136,20 +140,16 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
     const map = new MLMap({
       container: el.current,
       style: BASE,
-      bounds: JAPAN,
+      bounds: USA,
       fitBoundsOptions: { padding: 40 },
       attributionControl: { compact: true },
     })
     mapRef.current = map
 
-    const reportView = () => {
-      const b = map.getBounds()
-      onViewRef.current([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(3)).join(','))
-    }
-    map.on('moveend', reportView)
+    map.on('moveend', () => setMoved(true))
 
     map.on('load', () => {
-      reportView()
+      locate(map)
       map.addSource('hot', { type: 'geojson', data: EMPTY })
       map.addSource('inc', { type: 'geojson', data: EMPTY })
       map.addSource('inc-c', { type: 'geojson', data: EMPTY })
@@ -234,6 +234,32 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
   }, [])
 
   useEffect(() => {
+    if (busy) setMoved(false)
+  }, [busy])
+
+  // Fly to the user's position (the browser asks for permission once); denied or unavailable keeps the current view.
+  function locate(map = mapRef.current) {
+    if (!map || !('geolocation' in navigator)) return
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false)
+        map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: LOCAL_ZOOM, duration: 1200 })
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 },
+    )
+  }
+
+  function analyze() {
+    const m = mapRef.current
+    if (!m) return
+    const b = m.getBounds()
+    setMoved(false)
+    onAnalyze([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(3)).join(','))
+  }
+
+  useEffect(() => {
     pushData()
     // pushData reads refs; re-run whenever the data or selection changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -250,6 +276,26 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
   return (
     <div className="absolute inset-0">
       <div ref={el} className="h-full w-full" aria-label="Hotspot map" />
+      {moved && !busy && (
+        <button
+          type="button"
+          onClick={analyze}
+          className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-2 bg-lime px-4 py-2 font-mono text-[12px] uppercase tracking-wider text-canvas shadow-lg hover:brightness-110"
+        >
+          <Search className="size-4" aria-hidden />
+          Search this area
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => locate()}
+        disabled={locating}
+        aria-label="My location"
+        title="My location"
+        className="absolute bottom-14 right-4 flex size-10 items-center justify-center border border-iron bg-canvas/85 text-bone backdrop-blur-sm hover:text-lime disabled:opacity-50"
+      >
+        <LocateFixed className={`size-5 ${locating ? 'animate-pulse' : ''}`} aria-hidden />
+      </button>
     </div>
   )
 }
