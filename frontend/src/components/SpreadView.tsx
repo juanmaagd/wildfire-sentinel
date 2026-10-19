@@ -78,6 +78,9 @@ const STYLE: StyleSpecification = {
       tileSize: 256,
       maxzoom: 18,
       tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+      // Only over Japan: elsewhere GSI has low-res Landsat at low zoom and 404s above it, and MapLibre would stretch
+      // those blurry parent tiles over Esri's sharp imagery.
+      bounds: [122, 20, 154, 46],
       attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>',
     },
     dem: {

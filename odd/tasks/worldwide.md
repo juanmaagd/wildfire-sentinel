@@ -34,3 +34,4 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - L10 (2026-10-20) S7. Live 5° box in Zambia: 150 triaged (1,659 weaker skipped), 10 probes automatic, 138 on demand, 77 s (was 226 s with all probes); 15° box → 400.
 - L11 (2026-10-20) "Es demasiado zoom el que debo hacer" → span 30°. 25° box (Iberia+France) accepted; whole-USA view (59°) still asks to zoom in.
 - L12 (2026-10-20) S8. Cause: 150 triage downloads unbounded filled the default thread pool; opening the first alert mid-run took 80 s. After: 4.1 s mid-run (fresh region). Standalone probe 6.6-8.5 s → 1.4-4 s; wide photo, GIBS and Open-Meteo ~1 s each, in parallel.
+- L13 (2026-10-20) "la prediccion del spread el 3D se ve pesimo fuera de japon": GSI seamlessphoto has low-res Landsat worldwide at low zoom and 404s above; MapLibre stretched those parent tiles over Esri. GSI source bounded to Japan [122,20,154,46]. Verified Zambia sharp, Ofunato unchanged.
