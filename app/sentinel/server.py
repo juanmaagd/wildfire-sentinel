@@ -5,12 +5,14 @@ from datetime import datetime
 import json
 import os
 import traceback
+
+import httpx
 from collections.abc import AsyncIterable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 
@@ -172,6 +174,19 @@ async def report(hotspot_id: str) -> dict:
     if hotspot_id not in HOTSPOTS:
         raise HTTPException(404, "unknown hotspot (run live or replay first)")
     return await report_on_demand(hotspot_id)
+
+
+TILES = httpx.AsyncClient(timeout=15)
+
+
+@app.get("/api/tiles/imagery/{z}/{x}/{y}")
+async def imagery_tile(z: int, x: int, y: int) -> Response:
+    """Esri World Imagery for the map outside GSI coverage, proxied so ESRI_API_KEY stays on the server."""
+    resp = await TILES.get(sources._tile_url("esri", z, x, y))
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code if resp.status_code == 404 else 502, "tile unavailable")
+    return Response(resp.content, media_type=resp.headers.get("content-type", "image/jpeg"),
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/images/{name}")

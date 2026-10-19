@@ -38,6 +38,10 @@ def firms_key() -> str:
     return os.environ.get("FIRMS_MAP_KEY") or os.environ["MAP_KEYS"]
 
 
+def esri_key() -> str | None:
+    return os.environ.get("ESRI_API_KEY")
+
+
 def aiand_key() -> str:
     return os.environ["AIAND_API_KEY"]
 

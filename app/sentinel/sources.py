@@ -10,10 +10,14 @@ from pathlib import Path
 import httpx
 from PIL import Image
 
-from .config import IMAGES_DIR, firms_key
+from .config import IMAGES_DIR, esri_key, firms_key
 
 FIRMS_URL = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/{source}/{bbox}/{days}"
 GSI_TILE = "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
+# Esri World Imagery outside Japan. With ESRI_API_KEY (ArcGIS Location Platform) the metered basemap service,
+# otherwise the public endpoint, which is fine for development but not licensed for production traffic.
+ESRI_TILE = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+ESRI_PUBLIC_TILE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 GIBS_SNAPSHOT = "https://wvs.earthdata.nasa.gov/api/v1/snapshot"
 TILE = 256
 
@@ -85,11 +89,27 @@ def _center_pixel(lat: float, lon: float, zoom: int) -> tuple[float, float]:
     return x, y
 
 
-def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768) -> Path:
-    """GSI orthophoto centered exactly on the point (stitch 4x4 tiles, crop `size` px). Cached on disk."""
+def _tile_url(provider: str, z: int, x: int, y: int) -> str:
+    if provider == "gsi":
+        return GSI_TILE.format(z=z, x=x, y=y)
+    key = esri_key()
+    return ESRI_TILE.format(z=z, x=x, y=y) + f"?token={key}" if key else ESRI_PUBLIC_TILE.format(z=z, x=x, y=y)
+
+
+def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768, provider: str = "auto") -> Path:
+    """Orthophoto centered exactly on the point (stitch 4x4 tiles, crop `size` px). Cached on disk.
+
+    `auto` uses GSI (official Japanese aerial photos) and falls back to Esri World Imagery where GSI has no photo
+    under the point; `gsi` raises OutsideJapan instead; `esri` forces Esri (used to compare both on the same sites).
+    """
     out = IMAGES_DIR / name
     if out.exists():
         return out
+    if provider == "auto":
+        try:
+            return aerial_mosaic(lat, lon, zoom, name, size, "gsi")
+        except OutsideJapan:
+            return aerial_mosaic(lat, lon, zoom, name, size, "esri")
     cx, cy = _center_pixel(lat, lon, zoom)
     tx0, ty0 = int(cx // TILE) - 2, int(cy // TILE) - 2
     canvas = Image.new("RGB", (TILE * 4, TILE * 4))
@@ -97,9 +117,9 @@ def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768)
     with httpx.Client(timeout=15) as client:
         for dy in range(4):
             for dx in range(4):
-                resp = client.get(GSI_TILE.format(z=zoom, x=tx0 + dx, y=ty0 + dy))
+                resp = client.get(_tile_url(provider, zoom, tx0 + dx, ty0 + dy))
                 if resp.status_code == 404:
-                    if (dx, dy) == center:  # no photo under the point itself: not Japan
+                    if (dx, dy) == center:  # no photo under the point itself (GSI: not Japan)
                         raise OutsideJapan(f"{lat},{lon}")
                     continue  # open sea at the edge of a wide view: leave it dark
                 resp.raise_for_status()

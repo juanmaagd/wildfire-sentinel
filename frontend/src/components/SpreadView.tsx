@@ -66,6 +66,13 @@ const compass = (deg: number) => COMPASS[Math.round((((deg % 360) + 360) % 360) 
 const STYLE: StyleSpecification = {
   version: 8,
   sources: {
+    world: {
+      type: 'raster',
+      tileSize: 256,
+      maxzoom: 18,
+      tiles: ['/api/tiles/imagery/{z}/{x}/{y}'],
+      attribution: 'Imagery: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    },
     photo: {
       type: 'raster',
       tileSize: 256,
@@ -83,6 +90,7 @@ const STYLE: StyleSpecification = {
   },
   layers: [
     { id: 'sea', type: 'background', paint: { 'background-color': '#0b2a3a' } },
+    { id: 'world', type: 'raster', source: 'world' },
     { id: 'photo', type: 'raster', source: 'photo' },
   ],
 }

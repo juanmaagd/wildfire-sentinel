@@ -9,6 +9,14 @@ export type VerdictFilter = 'all' | 'fires' | 'nonfire'
 const BASE: StyleSpecification = {
   version: 8,
   sources: {
+    // Esri World Imagery everywhere, GSI on top where it exists (Japan): missing GSI tiles let Esri show through.
+    world: {
+      type: 'raster',
+      tiles: ['/api/tiles/imagery/{z}/{x}/{y}'],
+      tileSize: 256,
+      maxzoom: 18,
+      attribution: 'Imagery: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    },
     gsi: {
       type: 'raster',
       tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'],
@@ -19,6 +27,17 @@ const BASE: StyleSpecification = {
   },
   layers: [
     { id: 'sea', type: 'background', paint: { 'background-color': '#0b2a3a' } },
+    {
+      id: 'world',
+      type: 'raster',
+      source: 'world',
+      paint: {
+        'raster-saturation': -0.95,
+        'raster-contrast': 0.1,
+        'raster-brightness-min': 0.02,
+        'raster-brightness-max': 0.2,
+      },
+    },
     {
       id: 'gsi',
       type: 'raster',
