@@ -1,4 +1,4 @@
-import { acqDate, toJst } from './format'
+import { acqDate, fmtDay, fmtDayTime } from './format'
 import type { Feature, Polygon } from 'geojson'
 import type { Site } from '../types'
 
@@ -16,8 +16,8 @@ export interface Incident {
   center: [number, number] // lon, lat
   outline: Feature<Polygon>
   lastDay: string // UTC acquisition date (compared with the replay day)
-  firstSeenJst: string // 'MM-DD' in Japan time, for display
-  lastSeenJst: string // 'MM-DD HH:MM' in Japan time, for display
+  firstSeen: string // day, viewer's time zone and locale
+  lastSeen: string // day + time, viewer's time zone and locale
   lastSeenMs: number // latest detection time, for sorting
   active: boolean // detected on the current replay day (or the day before); false = extinguished
 }
@@ -98,7 +98,7 @@ export function buildIncidents(sites: Record<string, Site>, currentDay?: string)
         detections: g.reduce((a, s) => a + (s.hotspot!.detections ?? 1), 0),
         days: [...new Set(g.map((s) => s.hotspot!.acq_date).filter(Boolean) as string[])].sort(),
         lastDay: [...g.map((s) => s.hotspot!.acq_date ?? '')].sort().at(-1) ?? '',
-        ...seenJst(g),
+        ...seen(g),
         maxFrp: Math.max(...g.map((s) => s.hotspot!.frp ?? 0)),
         center: [lon, lat] as [number, number],
         outline: hullOutline(g.map((s) => [s.hotspot!.lon, s.hotspot!.lat] as [number, number])),
@@ -113,9 +113,9 @@ export function buildIncidents(sites: Record<string, Site>, currentDay?: string)
     })
 }
 
-function seenJst(g: Site[]): { firstSeenJst: string; lastSeenJst: string; lastSeenMs: number } {
+function seen(g: Site[]): { firstSeen: string; lastSeen: string; lastSeenMs: number } {
   const times = g.map((s) => acqDate(s.hotspot!)).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime())
-  if (!times.length) return { firstSeenJst: '', lastSeenJst: '', lastSeenMs: 0 }
+  if (!times.length) return { firstSeen: '', lastSeen: '', lastSeenMs: 0 }
   const last = times[times.length - 1]
-  return { firstSeenJst: toJst(times[0]).slice(5, 10), lastSeenJst: toJst(last).slice(5, 16), lastSeenMs: last.getTime() }
+  return { firstSeen: fmtDay(times[0]), lastSeen: fmtDayTime(last), lastSeenMs: last.getTime() }
 }

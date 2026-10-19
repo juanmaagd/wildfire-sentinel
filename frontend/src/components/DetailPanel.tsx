@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import Lightbox from './Lightbox'
 import { Globe2, Share2 } from 'lucide-react'
 import type { Lang, Report, Signal, Site } from '../types'
-import { fmtAcq, humanize, ms, num, siteCoord, toJst, verdictLabel } from '../lib/format'
+import { fmtAcq, fmtDateTime, humanize, ms, num, siteCoord, verdictLabel } from '../lib/format'
 
 interface Props {
   site: Site | undefined
@@ -291,7 +291,7 @@ export default function DetailPanel({ site, lang, setLang, badImages, onBadImage
 
       {r?.key_evidence && r.key_evidence.length > 0 && <Section title="Key evidence"><List items={r.key_evidence} /></Section>}
       {r?.unknowns && r.unknowns.length > 0 && <Section title="Unknowns"><List items={r.unknowns} /></Section>}
-      {r?.generated_at && <p className="pt-2 font-mono text-[12px] text-ash">Report generated {toJst(r.generated_at)}{r.model ? ` · ${r.model}` : ''}</p>}
+      {r?.generated_at && <p className="pt-2 font-mono text-[12px] text-ash">Report generated {fmtDateTime(r.generated_at)}{r.model ? ` · ${r.model}` : ''}</p>}
     </div>
   )
 }

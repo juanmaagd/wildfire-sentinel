@@ -29,10 +29,25 @@ export const verdictLabel = (v?: Verdict | string): string =>
 export const urgencyOf = (s: Site): number =>
   Math.round(s.report?.scores?.urgency ?? 0)
 
-// Japan time for display: FIRMS gives UTC acquisition date + HHMM; the app shows JST everywhere.
-const JST = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+// Dates are shown in the viewer's own time zone and locale format (browser settings), wherever the fire is.
+const asDate = (d: Date | string): Date => (typeof d === 'string' ? new Date(d) : d)
+const DATE_TIME = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const DAY_TIME = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+const DAY = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const TIME = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' })
+const ZONE = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+  .formatToParts(new Date())
+  .find((p) => p.type === 'timeZoneName')?.value ?? ''
 
-export const toJst = (d: Date | string): string => `${JST.format(typeof d === 'string' ? new Date(d) : d)} JST`
+export const fmtDateTime = (d: Date | string): string => `${DATE_TIME.format(asDate(d))} ${ZONE}`
+export const fmtDayTime = (d: Date | string): string => DAY_TIME.format(asDate(d))
+export const fmtDay = (d: Date | string): string => DAY.format(asDate(d))
+export const fmtTime = (d: Date | string): string => TIME.format(asDate(d))
+export const localZone = ZONE
+
+// The backend asks Open-Meteo for Japan time, so forecast hours arrive as naive JST strings ("YYYY-MM-DDTHH:MM"
+// or "YYYY-MM-DD HH:MM JST"); pin them to +09:00 so they convert to the viewer's zone like any other instant.
+export const fromJst = (naive: string): Date => new Date(`${naive.replace(' JST', '').replace(' ', 'T').slice(0, 16)}:00+09:00`)
 
 export const acqDate = (h: { acq_date?: string; acq_time?: string | number }): Date | null => {
   if (!h.acq_date) return null
@@ -42,5 +57,5 @@ export const acqDate = (h: { acq_date?: string; acq_time?: string | number }): D
 
 export const fmtAcq = (s: Site): string => {
   const d = s.hotspot ? acqDate(s.hotspot) : null
-  return d ? toJst(d) : ''
+  return d ? fmtDateTime(d) : ''
 }

@@ -2,7 +2,7 @@ import type { Feature, FeatureCollection } from 'geojson'
 import { useEffect, useRef, useState } from 'react'
 import { Map as MLMap, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl'
 import { Clapperboard, Pause, Play, X } from 'lucide-react'
-import { humanize } from '../lib/format'
+import { fmtDateTime, fmtDayTime, fromJst, humanize, localZone } from '../lib/format'
 import WeatherTimeline, { type HourWeather } from './WeatherTimeline'
 import RealityCheck, { type RealityPoint } from './RealityCheck'
 
@@ -466,7 +466,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
         <div className="pointer-events-auto bg-canvas/80 backdrop-blur-sm px-5 py-4">
           <div className="font-sans font-normal text-[72px] leading-[0.95] tracking-[-0.03em] text-bone">Predicted spread</div>
           <div className="mt-1 font-mono text-[13px] uppercase tracking-wider text-ash">
-            3D spread prediction{data?.start ? ` · from satellite pass ${data.start}` : ''}
+            3D spread prediction{data?.start ? ` · from satellite pass ${fmtDateTime(fromJst(data.start))}` : ''}
           </div>
           {data?.observed && (
             <div className="mt-2 flex gap-4 font-mono text-[12px] uppercase tracking-wider text-ash">
@@ -476,7 +476,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
           )}
           {now ? (
             <div className="mt-3 font-mono text-[13px] uppercase tracking-wider tabular-nums text-bone">
-              <span className="text-ash">{now.time.slice(5).replace('T', ' ')} JST · +{Math.floor(hour)}h · </span>
+              <span className="text-ash">{fmtDayTime(fromJst(now.time))} {localZone} · +{Math.floor(hour)}h · </span>
               wind {now.wind_speed_ms.toFixed(1)} m/s {compass(now.wind_from_deg)} · gusts {(now.wind_gust_ms ?? 0).toFixed(1)} · RH {Math.round(now.humidity_pct)}%
               {now.precip_mm >= 0.5 && <span className="ml-2 text-[#6cb6ff]">· raining {now.precip_mm.toFixed(1)} mm/h — spread stalls</span>}
             </div>
@@ -501,7 +501,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
       {plan && showPlan && (
         <aside className="absolute bottom-6 right-6 top-[96px] flex w-[400px] flex-col bg-canvas/90 backdrop-blur-sm">
           <div className="flex items-start justify-between gap-3 border-b border-iron px-4 py-3 font-mono text-[12px] uppercase tracking-wider text-ash">
-            <span>Plan P{(active ?? 0) + 1} · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${plan.plan_time.slice(5).replace('T', ' ')} JST` : ''}</span>
+            <span>Plan P{(active ?? 0) + 1} · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${fmtDayTime(fromJst(plan.plan_time))} ${localZone}` : ''}</span>
             <button
               type="button"
               onClick={() => {

@@ -1,57 +1,15 @@
 import type { Feature, FeatureCollection } from 'geojson'
 import { useEffect, useRef, useState } from 'react'
 import { LocateFixed, Search } from 'lucide-react'
-import { Map as MLMap, type GeoJSONSource, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl'
+import { Map as MLMap, type GeoJSONSource, type MapLayerMouseEvent } from 'maplibre-gl'
 import type { Focus, Site } from '../types'
 import type { Incident } from '../lib/incidents'
 
 export type VerdictFilter = 'all' | 'fires' | 'nonfire'
 
-const BASE: StyleSpecification = {
-  version: 8,
-  sources: {
-    // Esri World Imagery everywhere, GSI on top where it exists (Japan): missing GSI tiles let Esri show through.
-    world: {
-      type: 'raster',
-      tiles: ['/api/tiles/imagery/{z}/{x}/{y}'],
-      tileSize: 256,
-      maxzoom: 18,
-      attribution: 'Imagery: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-    },
-    gsi: {
-      type: 'raster',
-      tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 18,
-      attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">出典：国土地理院</a>',
-    },
-  },
-  layers: [
-    { id: 'sea', type: 'background', paint: { 'background-color': '#0b2a3a' } },
-    {
-      id: 'world',
-      type: 'raster',
-      source: 'world',
-      paint: {
-        'raster-saturation': -0.95,
-        'raster-contrast': 0.1,
-        'raster-brightness-min': 0.02,
-        'raster-brightness-max': 0.2,
-      },
-    },
-    {
-      id: 'gsi',
-      type: 'raster',
-      source: 'gsi',
-      paint: {
-        'raster-saturation': -0.95,
-        'raster-contrast': 0.1,
-        'raster-brightness-min': 0.02,
-        'raster-brightness-max': 0.2,
-      },
-    },
-  ],
-}
+// OpenFreeMap "dark" (OpenStreetMap vector tiles, no key, local-language labels): the same detailed basemap in
+// every country. GSI's pale map only exists for Japan, and darkened imagery elsewhere read as "not loaded".
+const BASE = 'https://tiles.openfreemap.org/styles/dark'
 
 const USA: [[number, number], [number, number]] = [[-125, 24], [-66, 50]] // default view when location is unavailable
 const LOCAL_ZOOM = 8 // ~150 km across: a region small enough that every hotspot in it gets analysed

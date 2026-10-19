@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
+import { fmtDay, fmtDayTime, fromJst, localZone } from '../lib/format'
 
 export interface HourWeather {
   time: string
@@ -157,7 +158,7 @@ export default function WeatherTimeline({ hourly, hour, onHour, marks = [], plan
 
   const dayIndices: number[] = []
   for (let i = 0; i < n; i++) {
-    if (hourly[i].time.endsWith('T00:00')) dayIndices.push(i)
+    if (fromJst(hourly[i].time).getHours() === 0) dayIndices.push(i) // local midnight of the viewer
   }
 
   const hourAt = (clientX: number): number => {
@@ -205,7 +206,7 @@ export default function WeatherTimeline({ hourly, hour, onHour, marks = [], plan
   if (hoverIdx !== null && pointer && hovered) {
     const t = hovered
     const lines = [
-      `${t.time.slice(5, 10)} ${t.time.slice(11, 16)} JST`,
+      `${fmtDayTime(fromJst(t.time))} ${localZone}`,
       `wind ${t.wind_speed_ms.toFixed(1)} m/s from ${compass(t.wind_from_deg)}`,
       `gust ${t.wind_gust_ms === null ? '—' : t.wind_gust_ms.toFixed(1)}`,
       `RH ${Math.round(t.humidity_pct)}%`,
@@ -289,7 +290,7 @@ export default function WeatherTimeline({ hourly, hour, onHour, marks = [], plan
                 strokeWidth={1}
               />
               <text x={x(i) + 3} y={LABEL_BASE} fontSize={11} fill={C.ash}>
-                {hourly[i].time.slice(5, 10)}
+                {fmtDay(fromJst(hourly[i].time))}
               </text>
             </g>
           ))}
@@ -362,7 +363,7 @@ export default function WeatherTimeline({ hourly, hour, onHour, marks = [], plan
           {runs.map((r) => {
             const left = Math.max(0, x(r.start) - step / 2)
             const right = Math.min(width, x(r.end) + step / 2)
-            const label = `RAIN ${r.total.toFixed(1)} mm · ${hourly[r.start].time.slice(5, 10)}`
+            const label = `RAIN ${r.total.toFixed(1)} mm · ${fmtDay(fromJst(hourly[r.start].time))}`
             const alignRight = left > width * 0.6
             return (
               <text
