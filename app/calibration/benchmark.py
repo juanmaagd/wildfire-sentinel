@@ -95,7 +95,7 @@ def evaluate(fire: tuple, params: dict) -> dict:
     data = load(fire)
     started = time.perf_counter()
     ctx = spread._prepare(data["lat"], data["lon"], data["hourly"], data["rain_7d"], params.get("fuel", "conifer_forest"),
-                          [tuple(s) for s in data["seeds"]], params["speed"], data["grid"])
+                          [tuple(s) for s in data["seeds"]], params["speed"], data["grid"], params.get("fuel_factors"))
     T = spread._arrival(ctx, ctx["burnable"], horizon_h=max(EVAL_HOURS))
     H, W = T.shape
     cell_ha = ctx["cell_m"] ** 2 / 1e4
@@ -173,8 +173,12 @@ if __name__ == "__main__":
     ap.add_argument("--speed", type=float, default=spread.SPEED)
     ap.add_argument("--fuel", default="conifer_forest")
     ap.add_argument("--only", nargs="*")
+    ap.add_argument("--landcover", action="store_true", help="per-cell fuel from ESA WorldCover (spread.FUEL_FACTORS)")
+    ap.add_argument("--fitted", action="store_true", help="speed and fuel factors from results/fit.json")
     a = ap.parse_args()
-    params = {"speed": a.speed, "fuel": a.fuel}
+    params = {"speed": a.speed, "fuel": a.fuel, "fuel_factors": spread.FUEL_FACTORS if a.landcover else None}
+    if a.fitted:
+        params.update(json.loads((HERE / "results" / "fit.json").read_text())["params"])
     results = run(params, a.only)
     summ = summary(results)
     (HERE / "results").mkdir(exist_ok=True)

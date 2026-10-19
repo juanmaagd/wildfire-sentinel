@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 from skimage import measure
 
-from . import scoring
+from . import landcover, scoring
 
 TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 ZOOM, TILES, DOWNSAMPLE = 11, 3, 3
@@ -56,26 +56,34 @@ def _dem(lat: float, lon: float) -> tuple[np.ndarray, float, float, float]:
     return grid, cell_m, tx0 * 256.0, ty0 * 256.0
 
 
+# Fuel factor per ESA WorldCover group (same scale as scoring.FUEL, 1.0 = conifer forest). Calibrated in
+# app/calibration; groups missing here don't burn.
+FUEL_FACTORS = {"tree": 1.0, "shrub": 0.9, "grass": 0.8, "crop": 0.35, "built": 0.15, "bare": 0.1, "wetland": 0.3}
+
 RAIN_STOP_MM = 2.0  # rain over the previous 24 h above this wets the fuel: spread nearly stops
 RAIN_FACTOR = 0.03
 
 
-def _hour_params(w: dict, fuel: float, rain_7d: float, rain_24h: float = 0.0) -> tuple[float, float, float, float]:
-    """(head ROS m/min, wind-to east, wind-to north, ellipse eccentricity) for one hour of weather."""
+def _hour_params(w: dict, fuel: float, rain_7d: float, rain_24h: float = 0.0) -> tuple[float, ...]:
+    """(head ROS m/min, wind-to east, wind-to north, ellipse eccentricity, a, b) for one hour of weather.
+    Head ROS in a cell of fuel factor f is (1 + a * f) * b, so a per-cell fuel grid can reuse the hour's numbers."""
     dryness = 0.5 * min(1, max(0, (70 - w["humidity_pct"]) / 45)) + 0.5 * min(1, max(0, (15 - rain_7d) / 15))
     wind = w["wind_speed_ms"]
-    r_head = (1.0 + 6.0 * fuel * dryness) * (1 + 0.3 * wind)
+    a, b = 6.0 * dryness, 1 + 0.3 * wind
     if rain_24h >= RAIN_STOP_MM or (w.get("precip_mm") or 0) >= 0.5:
-        r_head *= RAIN_FACTOR
+        b *= RAIN_FACTOR
     to = math.radians((w["wind_from_deg"] + 180) % 360)
     mph = wind * 2.237
     lb = min(3.5, max(1.0, 0.936 * math.exp(0.2566 * mph) + 0.461 * math.exp(-0.1548 * mph) - 0.397))
-    return r_head, math.sin(to), math.cos(to), math.sqrt(lb * lb - 1) / lb
+    return (1.0 + a * fuel) * b, math.sin(to), math.cos(to), math.sqrt(lb * lb - 1) / lb, a, b
 
 
 def _prepare(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str,
-             seeds: list[tuple[float, float]] | None, speed: float, grid: tuple | None = None) -> dict:
-    """`grid`: a precomputed `_dem()` result (the calibration benchmark reuses one per fire)."""
+             seeds: list[tuple[float, float]] | None, speed: float, grid: tuple | None = None,
+             fuel_factors: dict | None = None) -> dict:
+    """`grid`: a precomputed `_dem()` result (the calibration benchmark reuses one per fire).
+    `fuel_factors`: per land-cover group (ESA WorldCover); the fuel varies cell by cell. Without it, or if the land
+    cover can't be read, `fuel_type` applies to the whole grid."""
     dem, cell_m, ox, oy = grid or _dem(lat, lon)
     H, W = dem.shape
     px, py = _merc_px(lat, lon, ZOOM)
@@ -84,20 +92,43 @@ def _prepare(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
     rain_24h = [sum((x.get("precip_mm") or 0) for x in hourly[max(0, i - 24): i + 1]) for i in range(len(hourly))]
     params = [_hour_params(w, fuel, rain_7d, rain_24h[i]) for i, w in enumerate(hourly)] or [_hour_params(
         {"humidity_pct": 50, "wind_speed_ms": 3, "wind_from_deg": 270}, fuel, rain_7d)]
-    params = [(p[0] * speed, *p[1:]) for p in params]
+    params = [(p[0] * speed, *p[1:5], p[5] * speed) for p in params]
     starts = {ign}
     for s_lat, s_lon in seeds or []:
         sx, sy = _merc_px(s_lat, s_lon, ZOOM)
         cell = (int((sy - oy) / DOWNSAMPLE), int((sx - ox) / DOWNSAMPLE))
         if 0 <= cell[0] < H and 0 <= cell[1] < W:
             starts.add(cell)
-    return {"dem": dem, "cell_m": cell_m, "ox": ox, "oy": oy, "ign": ign, "params": params, "starts": starts,
-            "burnable": dem > 0.5}
+    ctx = {"dem": dem, "cell_m": cell_m, "ox": ox, "oy": oy, "ign": ign, "params": params, "starts": starts,
+           "burnable": dem > 0.5, "fuel_grid": None}
+    if fuel_factors:
+        try:
+            ctx["fuel_grid"] = _fuel_grid(ctx, fuel_factors)
+            ctx["burnable"] &= ctx["fuel_grid"] > 0
+        except Exception:  # land cover unavailable: keep the single fuel type
+            ctx["fuel_grid"] = None
+    return ctx
+
+
+def _fuel_grid(ctx: dict, factors: dict) -> np.ndarray:
+    H, W = ctx["dem"].shape
+    cols, rows = np.meshgrid(np.arange(W), np.arange(H))
+    x = ctx["ox"] + (cols + 0.5) * DOWNSAMPLE
+    y = ctx["oy"] + (rows + 0.5) * DOWNSAMPLE
+    n = 256 * 2**ZOOM
+    lons = x / n * 360 - 180
+    lats = np.degrees(np.arctan(np.sinh(np.pi * (1 - 2 * y / n))))
+    cls = landcover.classes(lons, lats, f"z{ZOOM}_{int(ctx['ox'])}_{int(ctx['oy'])}_{H}")
+    lut = np.zeros(256, np.float32)
+    for c, group in landcover.GROUP.items():
+        lut[c] = factors.get(group, 0.0) if group else 0.0
+    lut[0] = factors.get("tree", 1.0)  # no WorldCover tile (rare inland gaps): assume forest, the sea is excluded by elevation
+    return lut[cls]
 
 
 def _arrival(ctx: dict, burnable: np.ndarray, horizon_h: float = max(HOURS)) -> np.ndarray:
     """Minimum travel time (minutes) from the starts to every cell, with the weather of each hour."""
-    dem, cell_m, params = ctx["dem"], ctx["cell_m"], ctx["params"]
+    dem, cell_m, params, F = ctx["dem"], ctx["cell_m"], ctx["params"], ctx.get("fuel_grid")
     H, W = dem.shape
     T = np.full((H, W), np.inf)
     pq = []
@@ -110,7 +141,7 @@ def _arrival(ctx: dict, burnable: np.ndarray, horizon_h: float = max(HOURS)) -> 
         t, r, c = heapq.heappop(pq)
         if t > T[r, c] or t > horizon:
             continue
-        r_head, we, wn, ecc = params[min(int(t // 60), len(params) - 1)]  # weather at the fire's current time
+        r_head, we, wn, ecc, a, b = params[min(int(t // 60), len(params) - 1)]  # weather at the fire's current time
         for dr, dc in moves:
             rr, cc = r + dr, c + dc
             if not (0 <= rr < H and 0 <= cc < W) or not burnable[rr, cc]:
@@ -120,7 +151,8 @@ def _arrival(ctx: dict, burnable: np.ndarray, horizon_h: float = max(HOURS)) -> 
             cos_d = (east * we + north * wn) / dist
             rise = (dem[rr, cc] - dem[r, c]) / (cell_m * dist)
             slope_mult = 2 ** max(-1.0, min(2.0, math.degrees(math.atan(rise)) / 10))
-            ros = r_head * slope_mult * (1 - ecc) / (1 - ecc * cos_d)
+            head = r_head if F is None else (1.0 + a * F[rr, cc]) * b
+            ros = head * slope_mult * (1 - ecc) / (1 - ecc * cos_d)
             nt = t + cell_m * dist / ros
             if nt < T[rr, cc]:
                 T[rr, cc] = nt
@@ -277,7 +309,7 @@ def plan(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: 
     ring = grown & ~inside & ctx["burnable"]
     # Head + flanks only: the rear spreads slowly and is held by direct attack from the anchor point.
     # A forecast wind shift turns a flank or the rear into the new head, so then the line encircles the fire.
-    _, we, wn, ecc = ctx["params"][min(at_hour, len(ctx["params"]) - 1)]
+    _, we, wn, ecc = ctx["params"][min(at_hour, len(ctx["params"]) - 1)][:4]
     window = hourly[at_hour: at_hour + 12]
     dirs = [w["wind_from_deg"] for w in window]
     shift = max((abs((d - dirs[0] + 180) % 360 - 180) for d in dirs), default=0)
