@@ -74,8 +74,9 @@ def _hour_params(w: dict, fuel: float, rain_7d: float, rain_24h: float = 0.0) ->
 
 
 def _prepare(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: str,
-             seeds: list[tuple[float, float]] | None, speed: float) -> dict:
-    dem, cell_m, ox, oy = _dem(lat, lon)
+             seeds: list[tuple[float, float]] | None, speed: float, grid: tuple | None = None) -> dict:
+    """`grid`: a precomputed `_dem()` result (the calibration benchmark reuses one per fire)."""
+    dem, cell_m, ox, oy = grid or _dem(lat, lon)
     H, W = dem.shape
     px, py = _merc_px(lat, lon, ZOOM)
     ign = (int((py - oy) / DOWNSAMPLE), int((px - ox) / DOWNSAMPLE))
@@ -94,7 +95,7 @@ def _prepare(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
             "burnable": dem > 0.5}
 
 
-def _arrival(ctx: dict, burnable: np.ndarray) -> np.ndarray:
+def _arrival(ctx: dict, burnable: np.ndarray, horizon_h: float = max(HOURS)) -> np.ndarray:
     """Minimum travel time (minutes) from the starts to every cell, with the weather of each hour."""
     dem, cell_m, params = ctx["dem"], ctx["cell_m"], ctx["params"]
     H, W = dem.shape
@@ -103,7 +104,7 @@ def _arrival(ctx: dict, burnable: np.ndarray) -> np.ndarray:
     for cell in ctx["starts"]:
         T[cell] = 0.0
         pq.append((0.0, *cell))
-    horizon = 60 * max(HOURS) + 1
+    horizon = 60 * horizon_h + 1
     moves = [(dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0)]
     while pq:
         t, r, c = heapq.heappop(pq)
