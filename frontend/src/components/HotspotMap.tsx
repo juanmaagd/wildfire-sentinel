@@ -83,6 +83,7 @@ interface Props {
   selectedId: string | null
   fly: Focus | null
   onSelect: (id: string) => void
+  onView: (bbox: string) => void // current view as "west,south,east,north": live analyses what is on screen
 }
 
 const incidentGeo = (incidents: Incident[]): FeatureCollection => ({
@@ -99,7 +100,7 @@ const DOT_FILTER = {
   nonfire: ['!=', ['get', 'verdict'], 'possible_fire'],
 } as const
 
-export default function HotspotMap({ sites, incidents, filter, selectedId, fly, onSelect }: Props) {
+export default function HotspotMap({ sites, incidents, filter, selectedId, fly, onSelect, onView }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const loaded = useRef(false)
@@ -114,6 +115,8 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
   selRef.current = selectedId
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const onViewRef = useRef(onView)
+  onViewRef.current = onView
 
   const pushData = () => {
     const m = mapRef.current
@@ -139,7 +142,14 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
     })
     mapRef.current = map
 
+    const reportView = () => {
+      const b = map.getBounds()
+      onViewRef.current([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(3)).join(','))
+    }
+    map.on('moveend', reportView)
+
     map.on('load', () => {
+      reportView()
       map.addSource('hot', { type: 'geojson', data: EMPTY })
       map.addSource('inc', { type: 'geojson', data: EMPTY })
       map.addSource('inc-c', { type: 'geojson', data: EMPTY })

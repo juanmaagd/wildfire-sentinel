@@ -49,7 +49,7 @@ export function useRun() {
     if (name === 'done') finish('done', 'Run complete')
   }
 
-  const start = useCallback((mode: Mode) => {
+  const start = useCallback((mode: Mode, bbox?: string) => {
     runRef.current += 1
     const runId = runRef.current
     closeStream()
@@ -69,7 +69,7 @@ export function useRun() {
       return
     }
 
-    const es = new EventSource(`/api/run?mode=${encodeURIComponent(mode)}`)
+    const es = new EventSource(`/api/run?mode=${encodeURIComponent(mode)}${bbox ? `&bbox=${bbox}` : ''}`)
     esRef.current = es
     for (const name of EVENTS) {
       es.addEventListener(name, (e) => {

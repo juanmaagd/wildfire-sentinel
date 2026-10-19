@@ -90,6 +90,7 @@ async def report_on_demand(hotspot_id: str) -> dict:
               "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     return {"probe": cached["probe"], "report": report}
 PROBE_CONCURRENCY = 4  # every alert gets the deep probe; GSI/GIBS/Open-Meteo are public, so keep it gentle
+LIVE_MAX = 150  # live "this view": a wide view (a continent) has thousands of hotspots; triage the strongest
 JEV_CONCURRENCY = 8
 
 
@@ -98,8 +99,8 @@ def _img(name: str) -> str:
 
 
 class Run:
-    def __init__(self, mode: str, emit: Emit):
-        self.mode, self.emit = mode, emit
+    def __init__(self, mode: str, emit: Emit, bbox: tuple[float, float, float, float] = JAPAN_BBOX):
+        self.mode, self.emit, self.bbox = mode, emit, bbox
         self.stats = {"mode": mode, "total": 0, "in_japan": 0, "filtered_industrial": 0, "memory_hits": 0,
                       "alerts": 0, "jev_calls": 0, "reports": 0, "elapsed_s": 0.0}
         self.started = time.perf_counter()
@@ -133,7 +134,7 @@ class Run:
             close = f"{h.lat:.4f}_{h.lon:.4f}_z16.jpg"
             try:
                 path = await asyncio.to_thread(sources.aerial_mosaic, h.lat, h.lon, 16, close)
-            except sources.OutsideJapan:
+            except sources.NoImagery:
                 await self.emit("triage", {"id": h.id, "verdict": "outside", "source": "gsi", "confidence": 1.0,
                                            "signals": {}, "latency_ms": 0, "image_url": None})
                 return None
@@ -204,8 +205,10 @@ class Run:
                                     detections=DRILL["detections"])
                 await self.batch([h], mem, jv, None)
             else:
-                rows = await asyncio.to_thread(sources.fetch_hotspots, JAPAN_BBOX, 2)
-                await self.batch(sources.cluster_hotspots(rows), mem, jv, None)
+                rows = await asyncio.to_thread(sources.fetch_hotspots, self.bbox, 2)
+                hotspots = sources.cluster_hotspots(rows)  # strongest FRP first
+                self.stats["skipped_weak"] = max(0, len(hotspots) - LIVE_MAX)
+                await self.batch(hotspots[:LIVE_MAX], mem, jv, None)
             await asyncio.gather(*self.background)
         await self.summary()
         await self.emit("done", {})

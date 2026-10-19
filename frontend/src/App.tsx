@@ -20,6 +20,7 @@ export default function App() {
   // Deep probe on demand: the run only analyses the strongest alert per batch automatically.
   const [probeState, setProbeState] = useState<Record<string, string>>({})
   const [fly, setFly] = useState<Focus | null>(null)
+  const viewRef = useRef<string | undefined>(undefined)
   const [bad, setBad] = useState<Set<string>>(() => new Set())
   const [spreadOpen, setSpreadOpen] = useState(false)
   const [graphOpen, setGraphOpen] = useState(false)
@@ -128,7 +129,7 @@ export default function App() {
 
       <main className="relative min-h-0 flex-1">
         {/* The map is the protagonist: full-bleed, everything else floats over it and can be collapsed. */}
-        <HotspotMap sites={sites} incidents={incidents} filter={filter} selectedId={state.selectedId} fly={fly} onSelect={(id) => pickFromList(id)} />
+        <HotspotMap sites={sites} incidents={incidents} filter={filter} selectedId={state.selectedId} fly={fly} onSelect={(id) => pickFromList(id)} onView={(b) => (viewRef.current = b)} />
 
         {/* Floating top-left column: product bar (no page header) + compact KPI strip. */}
         <div className="absolute left-4 top-4 flex flex-col items-start gap-2">
@@ -137,7 +138,7 @@ export default function App() {
             statusText={state.statusText}
             mode={state.mode}
             day={state.day}
-            onStart={start}
+            onStart={(m) => start(m, m === 'live' ? viewRef.current : undefined)}
             isMock={isMock}
             paused={paused}
             onTogglePause={togglePause}

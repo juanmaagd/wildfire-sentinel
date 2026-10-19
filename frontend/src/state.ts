@@ -128,10 +128,11 @@ function onEvent(state: State, name: string, raw: unknown, at: number): State {
         jev: typeof d.jev_calls === 'number' ? d.jev_calls : state.stats.jev,
         elapsed: typeof d.elapsed_s === 'number' ? d.elapsed_s : state.stats.elapsed,
       }
-      const inJp = d.in_japan != null ? ` (${String(d.in_japan)} in Japan)` : ''
+      const inJp = d.in_japan != null ? ` (${String(d.in_japan)} imaged)` : ''
+      const weak = typeof d.skipped_weak === 'number' && d.skipped_weak > 0 ? `, ${String(d.skipped_weak)} weaker ones skipped (zoom in to analyse them)` : ''
       return pushFeed(
         { ...state, stats },
-        `Summary: ${String(d.total)} hotspots${inJp}, ${String(d.filtered_industrial)} industrial filtered, ${String(d.alerts)} alert(s), ${String(d.jev_calls)} Jev calls in ${num(d.elapsed_s, 1)} s`,
+        `Summary: ${String(d.total)} hotspots${inJp}, ${String(d.filtered_industrial)} industrial filtered, ${String(d.alerts)} alert(s), ${String(d.jev_calls)} Jev calls in ${num(d.elapsed_s, 1)} s${weak}`,
         'sys',
         at,
       )

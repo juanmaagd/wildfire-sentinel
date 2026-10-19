@@ -11,13 +11,13 @@ from collections.abc import AsyncIterable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 
 from . import analyst, graph, memory, sources, spread, video
-from .config import IMAGES_DIR, OFUNATO_BBOX, OFUNATO_OFFICIAL, ROOT
+from .config import IMAGES_DIR, JAPAN_BBOX, OFUNATO_BBOX, OFUNATO_OFFICIAL, ROOT
 from .pipeline import ASSESSED, HOTSPOTS, Run, probe_on_demand, report_on_demand
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # embedding model is cached locally; don't hit the HF Hub per run
@@ -34,10 +34,25 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Wildfire Sentinel", lifespan=lifespan)
 
 
-@app.get("/api/run", response_class=EventSourceResponse)
-async def run(mode: str = "live") -> AsyncIterable[ServerSentEvent]:
+def _run_args(mode: str = "live", bbox: str | None = None) -> tuple[str, tuple[float, float, float, float]]:
+    """Validated before the stream opens: an HTTPException inside the SSE generator would arrive as a 200."""
     if mode not in ("live", "replay", "drill"):
         raise HTTPException(400, "mode must be live, replay or drill")
+    if not bbox:
+        return mode, JAPAN_BBOX
+    try:  # live over the map view: "west,south,east,north", clamped to the world
+        w, s, e, n = (float(v) for v in bbox.split(","))
+    except ValueError:
+        raise HTTPException(400, "bbox must be west,south,east,north")
+    area = (max(w, -180.0), max(s, -90.0), min(e, 180.0), min(n, 90.0))
+    if area[0] >= area[2] or area[1] >= area[3]:
+        raise HTTPException(400, "bbox is empty")
+    return mode, area
+
+
+@app.get("/api/run", response_class=EventSourceResponse)
+async def run(args: tuple = Depends(_run_args)) -> AsyncIterable[ServerSentEvent]:
+    mode, area = args
     queue: asyncio.Queue = asyncio.Queue()
 
     async def emit(event: str, data: dict) -> None:
@@ -45,7 +60,7 @@ async def run(mode: str = "live") -> AsyncIterable[ServerSentEvent]:
 
     async def worker() -> None:
         try:
-            await Run(mode, emit).run()
+            await Run(mode, emit, area).run()
         except Exception as exc:  # surface failures to the UI instead of a silent hang
             traceback.print_exc()
             await queue.put(("error", {"message": f"{type(exc).__name__}: {exc}"}))

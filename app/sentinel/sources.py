@@ -37,8 +37,8 @@ class Hotspot:
                 "acq_date": self.acq_date, "acq_time": self.acq_time, "detections": self.detections}
 
 
-class OutsideJapan(Exception):
-    """No GSI aerial tile exists for this point."""
+class NoImagery(Exception):
+    """No aerial tile exists under this point (GSI outside Japan; Esri almost never)."""
 
 
 def cluster_hotspots(rows: list[dict]) -> list[Hotspot]:
@@ -100,7 +100,7 @@ def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768,
     """Orthophoto centered exactly on the point (stitch 4x4 tiles, crop `size` px). Cached on disk.
 
     `auto` uses GSI (official Japanese aerial photos) and falls back to Esri World Imagery where GSI has no photo
-    under the point; `gsi` raises OutsideJapan instead; `esri` forces Esri (used to compare both on the same sites).
+    under the point; `gsi` raises NoImagery instead; `esri` forces Esri (used to compare both on the same sites).
     """
     out = IMAGES_DIR / name
     if out.exists():
@@ -108,7 +108,7 @@ def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768,
     if provider == "auto":
         try:
             return aerial_mosaic(lat, lon, zoom, name, size, "gsi")
-        except OutsideJapan:
+        except NoImagery:
             return aerial_mosaic(lat, lon, zoom, name, size, "esri")
     cx, cy = _center_pixel(lat, lon, zoom)
     tx0, ty0 = int(cx // TILE) - 2, int(cy // TILE) - 2
@@ -120,7 +120,7 @@ def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768,
                 resp = client.get(_tile_url(provider, zoom, tx0 + dx, ty0 + dy))
                 if resp.status_code == 404:
                     if (dx, dy) == center:  # no photo under the point itself (GSI: not Japan)
-                        raise OutsideJapan(f"{lat},{lon}")
+                        raise NoImagery(f"{lat},{lon}")
                     continue  # open sea at the edge of a wide view: leave it dark
                 resp.raise_for_status()
                 canvas.paste(Image.open(io.BytesIO(resp.content)).convert("RGB"), (dx * TILE, dy * TILE))

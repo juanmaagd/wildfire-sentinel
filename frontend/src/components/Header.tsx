@@ -12,7 +12,7 @@ interface Props {
   onTogglePause: () => void
 }
 
-const LABEL: Record<Mode, string> = { live: 'Live', drill: 'Drill · Ashikaga', replay: 'Replay · Ofunato' }
+const LABEL: Record<Mode, string> = { live: 'Live · this view', drill: 'Drill · Ashikaga', replay: 'Replay · Ofunato' }
 
 // Compact floating bar: brand · segmented mode control · short status.
 export default function Header({ status, statusText, mode, day, onStart, isMock, paused, onTogglePause }: Props) {

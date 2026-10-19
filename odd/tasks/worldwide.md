@@ -4,13 +4,13 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 ## Specs
 - S1 — "no solo limitarlo a japon sino worldwide a ser posible": aerial imagery for Jev everywhere. Decision (user, "dale hazlo"): GSI in Japan, Esri World Imagery elsewhere, validated first by comparing Jev verdicts on both providers.
 - S2 — Map basemaps (hotspot map, 3D spread view) show imagery outside Japan.
-- S3 — Live mode beyond the Japan bbox (scope pending user decision: region selector vs other).
+- S3 — Live mode beyond the Japan bbox. Decision (user, "2"): live analyses the current map view, capped to the strongest hotspots.
 - S4 — Times and report language per region (pending).
 
 ## Tasks
 - T1 S1 inline — provider-agnostic `aerial_mosaic` (auto = GSI then Esri), `ESRI_API_KEY` optional; spike `spike/provider_compare.py`. Done.
 - T2 S2 inline — `/api/tiles/imagery` proxy (key stays server-side), Esri layer under GSI in both maps. Done.
-- T3 S3 — pending decision.
+- T3 S3 inline — `/api/run?mode=live&bbox=w,s,e,n` (validated before the stream), `LIVE_MAX = 150` by FRP, `skipped_weak` in summary; Live button sends the map view. Done.
 - T4 S4 — pending.
 
 ## Log
@@ -18,3 +18,6 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - L2 (2026-10-20) "funcionaria bien con gsi tambien?" → "dale hazlo" (GSI + Esri, test first).
 - L3 Spike: Jev stage-1 verdict GSI vs Esri on 23 Japanese sites (industrial, water, other, possible_fire): 23/23 identical. Esri abroad: 8/8 expected (4 steelworks/refineries, 4 forests in CA, PT, GR, US).
 - L4 Without ESRI_API_KEY the public Esri endpoint is used: fine for development, production needs an ArcGIS Location Platform key (free tier, attribution required). Weather and timeline times are still JST everywhere (S4).
+- L5 (2026-10-20) User chose option 2 ("2"): live = map view with a cap.
+- L6 Live over southern Africa (20,-20,35,-5): 13,701 clusters, 150 strongest triaged, 147 alerts (savanna burning season: real vegetation fires, alert fatigue risk abroad), 226 s. Invalid bbox/mode now 400 (was 200 because the check ran inside the SSE generator).
+- L7 (2026-10-20) User: "No puedo registrarme en ESRI, no funciona el signup" — production imagery key pending.
