@@ -33,7 +33,7 @@ export default function Header({ status, statusText, mode, day, onStart, isMock,
       </div>
 
       <nav className="flex border border-iron" aria-label="Mode">
-        {(['drill', 'replay'] as const).map((m) => {
+        {(['replay'] as const).map((m) => {
           const active = mode === m && status !== 'idle'
           return (
             <button
