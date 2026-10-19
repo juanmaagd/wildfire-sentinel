@@ -34,7 +34,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Wildfire Sentinel", lifespan=lifespan)
 
 
-MAX_SPAN_DEG = 5.0  # ~500 km: a search covers a region, not a continent (same limit as the map button)
+MAX_SPAN_DEG = 30.0  # a country or region, not a continent (same limit as the map button); cost is capped by LIVE_MAX/AUTO_PROBE
 
 
 def _run_args(mode: str = "live", bbox: str | None = None) -> tuple[str, tuple[float, float, float, float]]:

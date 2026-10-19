@@ -12,7 +12,7 @@ export type VerdictFilter = 'all' | 'fires' | 'nonfire'
 const BASE = 'https://tiles.openfreemap.org/styles/dark'
 
 const USA: [[number, number], [number, number]] = [[-125, 24], [-66, 50]] // default view when location is unavailable
-const MAX_SPAN_DEG = 5 // ~500 km; the server rejects wider searches
+const MAX_SPAN_DEG = 30 // a country or region; the server rejects wider searches
 const LOCAL_ZOOM = 8 // ~150 km across: a region small enough that every hotspot in it gets analysed
 const EMPTY = { type: 'FeatureCollection' as const, features: [] as Feature[] }
 
