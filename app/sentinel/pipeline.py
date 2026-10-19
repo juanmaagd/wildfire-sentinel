@@ -16,6 +16,7 @@ Emit = Callable[[str, dict], Awaitable[None]]
 # On-demand ai& reports need what the run already computed; kept in process (single-user demo).
 HOTSPOTS: dict[str, sources.Hotspot] = {}
 ASSESSED: dict[str, dict] = {}  # id -> {"facts", "wide", "assessment"}
+INFLIGHT: dict[str, asyncio.Task] = {}  # id -> running assess(): background and on-demand share one probe
 
 
 def _jst(h: sources.Hotspot) -> str:
@@ -67,12 +68,27 @@ async def assess(h: sources.Hotspot, mem, jv, day: str | None, detections: int) 
     return probe_event, assessment
 
 
+async def assess_once(h: sources.Hotspot, mem, jv, day: str | None, detections: int) -> tuple[dict, dict]:
+    """assess() at most once per alert: opening an alert whose background probe is running (or still queued)
+    joins or starts that probe instead of downloading the same images again in parallel."""
+    if h.id in ASSESSED:
+        return ASSESSED[h.id]["probe"], ASSESSED[h.id]["assessment"]
+    task = INFLIGHT.get(h.id)
+    if task is None:
+        task = asyncio.create_task(assess(h, mem, jv, day, detections))
+        INFLIGHT[h.id] = task
+        task.add_done_callback(lambda _: INFLIGHT.pop(h.id, None))
+    return await asyncio.shield(task)  # one waiter going away doesn't cancel the probe for the others
+
+
 async def _ensure_assessed(hotspot_id: str) -> dict:
+    if hotspot_id in INFLIGHT:
+        await asyncio.shield(INFLIGHT[hotspot_id])
     if hotspot_id not in ASSESSED:
         h = HOTSPOTS[hotspot_id]
         day = None if hotspot_id.startswith("drill_") or h.acq_date == sources.today() else h.acq_date
         async with memory.client() as mem, jev.client() as jv:
-            await assess(h, mem, jv, day, h.detections)
+            await assess_once(h, mem, jv, day, h.detections)
     return ASSESSED[hotspot_id]
 
 
@@ -133,14 +149,16 @@ class Run:
                                        "image_url": _img(known["image"]) if known.get("image") else None})
         else:
             close = f"{h.lat:.4f}_{h.lon:.4f}_z16.jpg"
-            try:
-                path = await asyncio.to_thread(sources.aerial_mosaic, h.lat, h.lon, 16, close)
-            except sources.NoImagery:
-                await self.emit("triage", {"id": h.id, "verdict": "outside", "source": "gsi", "confidence": 1.0,
-                                           "signals": {}, "latency_ms": 0, "image_url": None})
-                return None
-            self.stats["in_japan"] += 1
+            # The download shares Jev's semaphore: unbounded, 150 parallel mosaics fill the thread pool and an alert
+            # the user opens waits behind all of them (measured 80 s).
             async with sem:
+                try:
+                    path = await asyncio.to_thread(sources.aerial_mosaic, h.lat, h.lon, 16, close)
+                except sources.NoImagery:
+                    await self.emit("triage", {"id": h.id, "verdict": "outside", "source": "gsi", "confidence": 1.0,
+                                               "signals": {}, "latency_ms": 0, "image_url": None})
+                    return None
+                self.stats["in_japan"] += 1
                 signals, ms = await jev.sentinel(jv, path)
             self.stats["jev_calls"] += 1
             verdict, confidence = scoring.classify(signals)
@@ -156,7 +174,7 @@ class Run:
 
     async def analyse(self, h: sources.Hotspot, mem, jv, day: str | None, batch_detections: int) -> None:
         """Automatic, cheap part: Jev deep probe + rule-based scores. The ai& report is on demand."""
-        probe_event, assessment = await assess(h, mem, jv, day, batch_detections)
+        probe_event, assessment = await assess_once(h, mem, jv, day, batch_detections)
         self.stats["jev_calls"] += 1
         await self.emit("probe", probe_event)
         await self.emit("report", assessment)

@@ -3,6 +3,7 @@
 import csv
 import io
 import math
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -115,12 +116,16 @@ def aerial_mosaic(lat: float, lon: float, zoom: int, name: str, size: int = 768,
     canvas = Image.new("RGB", (TILE * 4, TILE * 4))
     center = (int(cx // TILE) - tx0, int(cy // TILE) - ty0)
     with httpx.Client(timeout=15) as client:
-        for dy in range(4):
-            for dx in range(4):
-                resp = client.get(_tile_url(provider, zoom, tx0 + dx, ty0 + dy))
+        # The tile under the point first: outside Japan GSI answers 404 here and we switch to Esri at once.
+        first = client.get(_tile_url(provider, zoom, tx0 + center[0], ty0 + center[1]))
+        if first.status_code == 404:
+            raise NoImagery(f"{lat},{lon}")
+        first.raise_for_status()
+        others = [(dx, dy) for dy in range(4) for dx in range(4) if (dx, dy) != center]
+        with ThreadPoolExecutor(8) as pool:  # the other 15 tiles in parallel (gentle on the public tile servers)
+            resps = pool.map(lambda d: client.get(_tile_url(provider, zoom, tx0 + d[0], ty0 + d[1])), others)
+            for (dx, dy), resp in zip([center, *others], [first, *resps]):
                 if resp.status_code == 404:
-                    if (dx, dy) == center:  # no photo under the point itself (GSI: not Japan)
-                        raise NoImagery(f"{lat},{lon}")
                     continue  # open sea at the edge of a wide view: leave it dark
                 resp.raise_for_status()
                 canvas.paste(Image.open(io.BytesIO(resp.content)).convert("RGB"), (dx * TILE, dy * TILE))

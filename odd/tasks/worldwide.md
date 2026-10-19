@@ -9,6 +9,7 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - S4 — "las fechas ... deben enseñarse con el formato y depende donde está el usuario" (viewer's locale and time zone). Report language per region: pending.
 - S6 — "solo japon lo veo bien definido en el mapa como que los demas paises no me cargan": detailed basemap worldwide.
 - S7 — "deberiamos limitar le numero de alertas o que no sea en un espacio tan wide porque ... estamos haciendo deep analysis sobre todas y no es bajo demanda".
+- S8 — "cargo un mapa espero los puntos rojos, luego entro al primero y alli se queda mas de 6 segundos".
 
 ## Tasks
 - T1 S1 inline — provider-agnostic `aerial_mosaic` (auto = GSI then Esri), `ESRI_API_KEY` optional; spike `spike/provider_compare.py`. Done.
@@ -18,6 +19,7 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - T6 S6 inline — 2D basemap → OpenFreeMap dark (OSM vector, local labels). Done.
 - T5 S5 inline — "Search this area" on the map (only after a move, hidden while running; Live left the header), geolocation on load (zoom 8) with USA fallback, "My location" button. Done.
 - T7 S7 inline — search area ≤30° (raised from 5°: "Es demasiado zoom el que debo hacer"; button "Zoom in to search", server 400); live auto deep-probes only the 10 strongest alerts, the rest on open. Done.
+- T8 S8 inline — one probe per alert (INFLIGHT shared by background and on-demand), mosaic center tile first + 15 tiles in parallel, triage downloads under Jev's semaphore. Done.
 
 ## Log
 - L1 (2026-10-18) "Ahora tenemos que desplegarlo, pero antes me gustaria a no solo limitarlo a japon sino worldwide a ser posible"
@@ -31,3 +33,4 @@ Objective: make Wildfire Sentinel work outside Japan before deploying. Branch `f
 - L9 (2026-10-20) S4 + S6 requests. Verified headless with es-AR / America/Argentina/Buenos_Aires: "26 feb 2025, 1:14 p. m. ART"; Lisbon and Ofunato basemaps detailed.
 - L10 (2026-10-20) S7. Live 5° box in Zambia: 150 triaged (1,659 weaker skipped), 10 probes automatic, 138 on demand, 77 s (was 226 s with all probes); 15° box → 400.
 - L11 (2026-10-20) "Es demasiado zoom el que debo hacer" → span 30°. 25° box (Iberia+France) accepted; whole-USA view (59°) still asks to zoom in.
+- L12 (2026-10-20) S8. Cause: 150 triage downloads unbounded filled the default thread pool; opening the first alert mid-run took 80 s. After: 4.1 s mid-run (fresh region). Standalone probe 6.6-8.5 s → 1.4-4 s; wide photo, GIBS and Open-Meteo ~1 s each, in parallel.
