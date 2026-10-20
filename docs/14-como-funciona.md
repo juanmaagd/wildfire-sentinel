@@ -180,16 +180,16 @@ La relación "madre → hija" es una **inferencia por cercanía en el espacio y 
 | --- | --- |
 | **Punto(s) de inicio** | La alerta. En Replay: todas las detecciones del **primer pase del satélite** (el fuego ya tenía varios focos). |
 | **Terreno** | Un mapa de elevación (DEM) de ~45 × 45 km dividido en celdas de ~180 m. |
-| **Combustible** | Lo que respondió Jev: pasto, bosque de coníferas, bosque mixto… Cada uno quema a distinta velocidad. |
-| **Clima hora por hora, 7 días** | Open-Meteo: viento, dirección, ráfagas, humedad, lluvia. En Replay es el **clima histórico real** de esos días; en Live y Drill es el **pronóstico** desde ahora. |
+| **Combustible** | El mapa de vegetación de la ESA (WorldCover, todo el mundo) celda por celda: bosque, matorral, pasto, cultivos, ciudad, suelo desnudo, agua. Si no se puede leer, se usa lo que respondió Jev para toda la zona. |
+| **Clima hora por hora, 7 días** | Open-Meteo: viento, dirección, ráfagas, temperatura, humedad, lluvia. En Replay es el **clima histórico real** de esos días; en Live y Drill es el **pronóstico** desde ahora. |
 
 ### Las reglas del modelo
 
-1. **Velocidad base:** depende del combustible y de qué tan seco está todo (humedad del aire y lluvia de los últimos 7 días). Más viento significa más velocidad.
+1. **Velocidad base:** depende del combustible de cada celda y de la **humedad del combustible**, que cambia hora a hora: se seca con calor y aire seco, se moja con la lluvia y tarda unas horas en volver a secarse. La lluvia de los últimos 7 días también cuenta. Más viento significa más velocidad.
 2. **Forma de elipse:** el fuego avanza rápido **a favor del viento** (la "cabeza"), lento hacia los costados (los "flancos") y muy lento hacia atrás (la "cola"). Con más viento, la elipse es más alargada.
 3. **Pendiente:** cuesta arriba el fuego va más rápido (se duplica cada ~10° de inclinación); cuesta abajo, más lento.
-4. **Lluvia:** si cayeron ≥ 2 mm en las últimas 24 h, o llueve ≥ 0,5 mm/h, la propagación casi se detiene.
-5. **El mar no arde.**
+4. **Lluvia:** una lluvia corta (o una tormenta seca) frena el fuego unas horas; una lluvia fuerte lo detiene hasta que el combustible se seca.
+5. **El mar, los lagos y la nieve no arden;** cultivos, ciudad y suelo desnudo frenan el fuego.
 6. **El clima cambia cada hora:** el fuego usa el viento y la humedad de la hora en la que llega a cada lugar.
 
 ### Cómo se calcula: como un GPS
@@ -211,13 +211,13 @@ En Ofunato arrancamos la predicción con el primer pase del satélite (27/02, 00
 
 | Momento | Oficial | Predicción |
 | --- | --- | --- |
-| +30 h (28/02 a la mañana, NHK) | 1.200 ha | 2.600–3.100 ha (×2,2–2,6) |
-| 03/03 (Yomiuri) | 2.100 ha | ~×3,7 |
-| 05/03 6:00 (Iwate) | 2.900 ha | ~×3,8 |
-| Final (ciudad de Ofunato) | 3.370 ha | ~×3,4 |
+| +30 h (28/02 a la mañana, NHK) | 1.200 ha | 3.800–4.200 ha (×3,2–3,5) |
+| 03/03 (Yomiuri) | 2.100 ha | ~×4,5–5,5 |
+| 05/03 6:00 (Iwate) | 2.900 ha | ~×5,5 |
+| Final (ciudad de Ofunato) | 3.370 ha | ~×4,8 |
 
 - La predicción es el incendio **sin bomberos**; las cifras oficiales incluyen la extinción, así que la diferencia es lo que salvaron los bomberos más el error del modelo. El rango a +30 h depende del hotspot que abras.
-- La velocidad del modelo (`SPEED = 0,45`) se **calibró con 18 incendios de 9 países**, comparando las primeras 30 h con lo que vio el satélite (`docs/16-spread-calibration.md`). En los 6 incendios que no se usaron para ajustar, encuentra el 54 % del fuego (antes 33 %). Es un modelo simple, no un simulador profesional como FARSITE.
+- La velocidad del modelo (`SPEED = 1,0`) se **calibró con 18 incendios de 9 países**, comparando las primeras 30 h con lo que vio el satélite (`docs/16-spread-calibration.md`). En los 6 incendios que no se usaron para ajustar, encuentra el 67 % del fuego (el primer modelo, 33 %). Es un modelo simple, no un simulador profesional como FARSITE.
 - En el Replay se usa el combustible con el que se calibró (bosque de coníferas). La foto de un solo punto no representa un incendio de 3.000 ha.
 
 ---

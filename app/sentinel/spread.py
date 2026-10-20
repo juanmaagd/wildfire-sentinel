@@ -9,6 +9,7 @@ import heapq
 import io
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import numpy as np
@@ -20,7 +21,7 @@ from . import landcover, scoring
 TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 ZOOM, TILES, DOWNSAMPLE = 11, 3, 3
 HOURS = (3, 6, 12, 24, 48, 72, 96, 120, 168)
-SPEED = 0.45  # calibrated on 18 fires, first 30 h vs VIIRS (docs/16-spread-calibration.md): test F1 0.386 -> 0.480
+SPEED = 1.0  # calibrated on 18 fires, first 30 h vs VIIRS, with fuel moisture + land cover (docs/16-spread-calibration.md)
 VIIRS_TOLERANCE_CELLS = 2  # ~375 m VIIRS pixel ≈ 2 grid cells
 EARTH = 40075016.686
 
@@ -43,35 +44,71 @@ def _dem(lat: float, lon: float) -> tuple[np.ndarray, float, float, float]:
     px, py = _merc_px(lat, lon, ZOOM)
     tx0, ty0 = int(px // 256) - TILES // 2, int(py // 256) - TILES // 2
     grid = np.zeros((256 * TILES, 256 * TILES), dtype=np.float32)
-    with httpx.Client(timeout=20) as client:
-        for dy in range(TILES):
-            for dx in range(TILES):
-                r = client.get(TERRARIUM.format(z=ZOOM, x=tx0 + dx, y=ty0 + dy))
-                r.raise_for_status()
-                rgb = np.asarray(Image.open(io.BytesIO(r.content)).convert("RGB"), dtype=np.float32)
-                grid[dy * 256:(dy + 1) * 256, dx * 256:(dx + 1) * 256] = rgb[..., 0] * 256 + rgb[..., 1] + rgb[..., 2] / 256 - 32768
+
+    def fetch(dy: int, dx: int) -> None:
+        r = client.get(TERRARIUM.format(z=ZOOM, x=tx0 + dx, y=ty0 + dy))
+        r.raise_for_status()
+        rgb = np.asarray(Image.open(io.BytesIO(r.content)).convert("RGB"), dtype=np.float32)
+        grid[dy * 256:(dy + 1) * 256, dx * 256:(dx + 1) * 256] = rgb[..., 0] * 256 + rgb[..., 1] + rgb[..., 2] / 256 - 32768
+
+    with httpx.Client(timeout=20) as client, ThreadPoolExecutor(TILES * TILES) as pool:
+        list(pool.map(lambda i: fetch(*divmod(i, TILES)), range(TILES * TILES)))
     h = grid.shape[0] // DOWNSAMPLE
     grid = grid[: h * DOWNSAMPLE, : h * DOWNSAMPLE].reshape(h, DOWNSAMPLE, h, DOWNSAMPLE).mean(axis=(1, 3))
     cell_m = EARTH * math.cos(math.radians(lat)) / (256 * 2**ZOOM) * DOWNSAMPLE
     return grid, cell_m, tx0 * 256.0, ty0 * 256.0
 
 
-# Fuel factor per ESA WorldCover group (same scale as scoring.FUEL, 1.0 = conifer forest). Calibrated in
-# app/calibration; groups missing here don't burn.
+# Fuel factor per ESA WorldCover group (same scale as scoring.FUEL, 1.0 = conifer forest), cell by cell in production:
+# crops, towns and bare ground slow the fire, inland water and snow don't burn. Prior values (fitting them overfit).
 FUEL_FACTORS = {"tree": 1.0, "shrub": 0.9, "grass": 0.8, "crop": 0.35, "built": 0.15, "bare": 0.1, "wetland": 0.3}
 
-RAIN_STOP_MM = 2.0  # rain over the previous 24 h above this wets the fuel: spread nearly stops
-RAIN_FACTOR = 0.03
+# Dead fine-fuel moisture (fraction of dry weight), tracked hour by hour: it relaxes toward the equilibrium set by
+# temperature and humidity and jumps with rain, so a short shower or a dry thunderstorm only slows the fire for a few
+# hours while a soaking rain stops it for a day. Rothermel's moisture damping turns it into a speed factor.
+MOISTURE_EXT = 0.25  # moisture of extinction: the fire stops spreading at this fuel moisture
+MOISTURE_LAG_H = 6.0  # drying/wetting time lag (between 1-h and 10-h fuels)
+RAIN_WETTING = 0.05  # moisture added per mm of rain
+MOISTURE_MAX = 0.6
+ETA_MIN = 0.02
 
 
-def _hour_params(w: dict, fuel: float, rain_7d: float, rain_24h: float = 0.0) -> tuple[float, ...]:
+def _emc(rh: float, temp_c: float) -> float:
+    """Equilibrium moisture content of dead fuel (fraction), Simard (1968)."""
+    t = temp_c * 9 / 5 + 32
+    if rh < 10:
+        m = 0.03229 + 0.281073 * rh - 0.000578 * rh * t
+    elif rh < 50:
+        m = 2.22749 + 0.160107 * rh - 0.01478 * t
+    else:
+        m = 21.0606 + 0.005565 * rh * rh - 0.00035 * rh * t - 0.483199 * rh
+    return max(0.01, m / 100)
+
+
+def fuel_moisture(hourly: list[dict]) -> list[float]:
+    """Dead fine-fuel moisture at each hour of `hourly` (starts at equilibrium with the first hour)."""
+    out, m = [], None
+    keep = math.exp(-1 / MOISTURE_LAG_H)
+    for w in hourly:
+        temp = w.get("temp_c")
+        eq = _emc(w["humidity_pct"], 20.0 if temp is None else temp)
+        m = eq if m is None else eq + (m - eq) * keep
+        m = min(MOISTURE_MAX, m + RAIN_WETTING * (w.get("precip_mm") or 0))
+        out.append(m)
+    return out
+
+
+def _damping(moisture: float) -> float:
+    r = min(1.0, moisture / MOISTURE_EXT)
+    return max(ETA_MIN, 1 - 2.59 * r + 5.11 * r * r - 3.52 * r ** 3)
+
+
+def _hour_params(w: dict, fuel: float, rain_7d: float, moisture: float) -> tuple[float, ...]:
     """(head ROS m/min, wind-to east, wind-to north, ellipse eccentricity, a, b) for one hour of weather.
     Head ROS in a cell of fuel factor f is (1 + a * f) * b, so a per-cell fuel grid can reuse the hour's numbers."""
-    dryness = 0.5 * min(1, max(0, (70 - w["humidity_pct"]) / 45)) + 0.5 * min(1, max(0, (15 - rain_7d) / 15))
+    drought = 0.5 + 0.5 * min(1, max(0, (15 - rain_7d) / 15))  # a wet week keeps heavier fuels damp
     wind = w["wind_speed_ms"]
-    a, b = 6.0 * dryness, 1 + 0.3 * wind
-    if rain_24h >= RAIN_STOP_MM or (w.get("precip_mm") or 0) >= 0.5:
-        b *= RAIN_FACTOR
+    a, b = 6.0 * drought, (1 + 0.3 * wind) * _damping(moisture)
     to = math.radians((w["wind_from_deg"] + 180) % 360)
     mph = wind * 2.237
     lb = min(3.5, max(1.0, 0.936 * math.exp(0.2566 * mph) + 0.461 * math.exp(-0.1548 * mph) - 0.397))
@@ -89,9 +126,9 @@ def _prepare(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
     px, py = _merc_px(lat, lon, ZOOM)
     ign = (int((py - oy) / DOWNSAMPLE), int((px - ox) / DOWNSAMPLE))
     fuel = scoring.FUEL.get(fuel_type, 0.7)
-    rain_24h = [sum((x.get("precip_mm") or 0) for x in hourly[max(0, i - 24): i + 1]) for i in range(len(hourly))]
-    params = [_hour_params(w, fuel, rain_7d, rain_24h[i]) for i, w in enumerate(hourly)] or [_hour_params(
-        {"humidity_pct": 50, "wind_speed_ms": 3, "wind_from_deg": 270}, fuel, rain_7d)]
+    moisture = fuel_moisture(hourly)
+    params = [_hour_params(w, fuel, rain_7d, moisture[i]) for i, w in enumerate(hourly)] or [_hour_params(
+        {"humidity_pct": 50, "wind_speed_ms": 3, "wind_from_deg": 270}, fuel, rain_7d, _emc(50, 20))]
     params = [(p[0] * speed, *p[1:5], p[5] * speed) for p in params]
     starts = {ign}
     for s_lat, s_lon in seeds or []:
@@ -196,7 +233,7 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
     """`seeds`: every burning point seen at t=0 (multi-point ignition); defaults to the alert location.
     `checkpoints`: extra hours whose predicted area is returned in `area_at` (to compare with official figures)."""
     started = time.perf_counter()
-    ctx = _prepare(lat, lon, hourly, rain_7d, fuel_type, seeds, speed)
+    ctx = _prepare(lat, lon, hourly, rain_7d, fuel_type, seeds, speed, fuel_factors=FUEL_FACTORS)
     dem, cell_m, ox, oy, ign, params, starts = (ctx[k] for k in ("dem", "cell_m", "ox", "oy", "ign", "params", "starts"))
     T = _arrival(ctx, ctx["burnable"])
     w0 = hourly[0] if hourly else {"wind_from_deg": 270, "wind_speed_ms": 3, "wind_gust_ms": 5}
@@ -249,8 +286,9 @@ def simulate(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_ty
         "area_at": area_at,
         "stats": {"area_ha": areas, "max_ros_m_min": round(max(p[0] for p in params) * 2, 1),
                   "head_direction_deg": round((w0["wind_from_deg"] + 180) % 360), "cell_m": round(cell_m),
-                  "fuel": fuel_type, "weather_hours": len(hourly)},
-        "model": "elliptical wind-slope spread with hourly weather, minimum travel time on terrain grid",
+                  "fuel": "ESA WorldCover land cover" if ctx["fuel_grid"] is not None else fuel_type,
+                  "weather_hours": len(hourly)},
+        "model": "elliptical wind-slope spread with hourly weather and fuel moisture, per-cell land cover, minimum travel time on terrain grid",
         "elapsed_ms": int((time.perf_counter() - started) * 1000),
     }
 
@@ -296,7 +334,7 @@ def plan(lat: float, lon: float, hourly: list[dict], rain_7d: float, fuel_type: 
     """Response plan decided at `at_hour`: a control line cut where the head and flanks will be `lead_h` hours later,
     then the same weather re-simulated with that line as non-burnable fuel. Returns geometry and with/without numbers."""
     started = time.perf_counter()
-    ctx = _prepare(lat, lon, hourly, rain_7d, fuel_type, seeds, SPEED)
+    ctx = _prepare(lat, lon, hourly, rain_7d, fuel_type, seeds, SPEED, fuel_factors=FUEL_FACTORS)
     T0 = _arrival(ctx, ctx["burnable"])
     to_lonlat = _lonlat_fn(ctx)
     t_plan, t_line = 60 * at_hour, 60 * (at_hour + lead_h)

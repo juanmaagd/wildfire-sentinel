@@ -193,10 +193,10 @@ def today() -> str:
 
 
 def hourly_weather(lat: float, lon: float, day: str | None, hours: int = 168, start: str | None = None) -> list[dict]:
-    """Hourly wind/humidity for the spread model. Replay: archive from `start` (JST "YYYY-MM-DDTHH:00", default
+    """Hourly wind/humidity/temperature/rain for the spread model. Replay: archive from `start` (JST "YYYY-MM-DDTHH:00", default
     14:00 on `day`). Live: forecast from now."""
     params = {"latitude": lat, "longitude": lon, "timezone": "Asia/Tokyo", "wind_speed_unit": "ms",
-              "hourly": "relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation"}
+              "hourly": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation"}
     if day:
         day0 = date.fromisoformat(day)
         end = day0 + timedelta(days=hours // 24 + 2)
@@ -214,7 +214,7 @@ def hourly_weather(lat: float, lon: float, day: str | None, hours: int = 168, st
     return [
         {"time": h["time"][i], "humidity_pct": h["relative_humidity_2m"][i], "wind_speed_ms": h["wind_speed_10m"][i],
          "wind_from_deg": h["wind_direction_10m"][i], "wind_gust_ms": h["wind_gusts_10m"][i],
-         "precip_mm": h["precipitation"][i] or 0.0}
+         "precip_mm": h["precipitation"][i] or 0.0, "temp_c": h["temperature_2m"][i]}
         for i in range(i0, min(i0 + hours + 1, len(h["time"])))
         if h["wind_speed_10m"][i] is not None
     ]

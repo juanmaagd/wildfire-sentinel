@@ -1,0 +1,661 @@
+{
+ "params": {
+  "speed": 1.0,
+  "fuel": "conifer_forest",
+  "fuel_factors": {
+   "tree": 1.0,
+   "shrub": 0.9,
+   "grass": 0.8,
+   "crop": 0.35,
+   "built": 0.15,
+   "bare": 0.1,
+   "wetland": 0.3
+  }
+ },
+ "summary": {
+  "train": {
+   "12": {
+    "recall": 0.478,
+    "precision": 0.604,
+    "f1": 0.476,
+    "ratio_median": 0.56
+   },
+   "24": {
+    "recall": 0.496,
+    "precision": 0.594,
+    "f1": 0.473,
+    "ratio_median": 0.49
+   },
+   "30": {
+    "recall": 0.54,
+    "precision": 0.59,
+    "f1": 0.492,
+    "ratio_median": 0.56
+   }
+  },
+  "test": {
+   "12": {
+    "recall": 0.541,
+    "precision": 0.459,
+    "f1": 0.44,
+    "ratio_median": 0.96
+   },
+   "24": {
+    "recall": 0.666,
+    "precision": 0.426,
+    "f1": 0.512,
+    "ratio_median": 1.26
+   },
+   "30": {
+    "recall": 0.669,
+    "precision": 0.424,
+    "f1": 0.507,
+    "ratio_median": 1.47
+   }
+  },
+  "all": {
+   "12": {
+    "recall": 0.498,
+    "precision": 0.555,
+    "f1": 0.465,
+    "ratio_median": 0.7
+   },
+   "24": {
+    "recall": 0.553,
+    "precision": 0.538,
+    "f1": 0.486,
+    "ratio_median": 0.77
+   },
+   "30": {
+    "recall": 0.583,
+    "precision": 0.535,
+    "f1": 0.497,
+    "ratio_median": 0.98
+   }
+  }
+ },
+ "fires": {
+  "ofunato": {
+   "split": "train",
+   "note": "Japan, conifer, coastal hills",
+   "seeds": 19,
+   "hours": {
+    "12": {
+     "recall": 0.353,
+     "precision": 0.76,
+     "f1": 0.482,
+     "pred_ha": 780,
+     "seen_ha": 1548,
+     "detections": 51
+    },
+    "24": {
+     "recall": 0.559,
+     "precision": 0.656,
+     "f1": 0.604,
+     "pred_ha": 1345,
+     "seen_ha": 1586,
+     "detections": 59
+    },
+    "30": {
+     "recall": 0.608,
+     "precision": 0.697,
+     "f1": 0.649,
+     "pred_ha": 1557,
+     "seen_ha": 1833,
+     "detections": 74
+    }
+   },
+   "official": {
+    "hours": 30.0,
+    "official_ha": 1200,
+    "pred_ha": 1557,
+    "source": "NHK, Feb 28 morning"
+   },
+   "ms": 14
+  },
+  "camp": {
+   "split": "train",
+   "note": "California, wind-driven, pine + town",
+   "seeds": 133,
+   "hours": {
+    "12": {
+     "recall": 0.388,
+     "precision": 0.604,
+     "f1": 0.472,
+     "pred_ha": 7034,
+     "seen_ha": 11738,
+     "detections": 312
+    },
+    "24": {
+     "recall": 0.423,
+     "precision": 0.721,
+     "f1": 0.533,
+     "pred_ha": 16100,
+     "seen_ha": 31315,
+     "detections": 2067
+    },
+    "30": {
+     "recall": 0.451,
+     "precision": 0.714,
+     "f1": 0.553,
+     "pred_ha": 19353,
+     "seen_ha": 35180,
+     "detections": 2637
+    }
+   },
+   "ms": 55
+  },
+  "palisades": {
+   "split": "train",
+   "note": "California, chaparral, Santa Ana wind",
+   "seeds": 67,
+   "hours": {
+    "12": {
+     "recall": 1.0,
+     "precision": 0.878,
+     "f1": 0.935,
+     "pred_ha": 1570,
+     "seen_ha": 1869,
+     "detections": 96
+    },
+    "24": {
+     "recall": 0.372,
+     "precision": 1.0,
+     "f1": 0.543,
+     "pred_ha": 2315,
+     "seen_ha": 14928,
+     "detections": 1791
+    },
+    "30": {
+     "recall": 0.417,
+     "precision": 1.0,
+     "f1": 0.589,
+     "pred_ha": 2747,
+     "seen_ha": 15249,
+     "detections": 2221
+    }
+   },
+   "ms": 16
+  },
+  "marshall": {
+   "split": "train",
+   "note": "Colorado, grassland, extreme wind",
+   "seeds": 69,
+   "hours": {
+    "12": {
+     "recall": 0.977,
+     "precision": 0.831,
+     "f1": 0.898,
+     "pred_ha": 2493,
+     "seen_ha": 2576,
+     "detections": 43
+    },
+    "24": {
+     "recall": 0.99,
+     "precision": 0.759,
+     "f1": 0.859,
+     "pred_ha": 3766,
+     "seen_ha": 3222,
+     "detections": 101
+    },
+    "30": {
+     "recall": 1.0,
+     "precision": 0.734,
+     "f1": 0.846,
+     "pred_ha": 3979,
+     "seen_ha": 3222,
+     "detections": 101
+    }
+   },
+   "ms": 14
+  },
+  "vina_del_mar": {
+   "split": "train",
+   "note": "Chile, eucalyptus and shrub",
+   "seeds": 166,
+   "hours": {
+    "12": {
+     "recall": 0.3,
+     "precision": 0.819,
+     "f1": 0.439,
+     "pred_ha": 2797,
+     "seen_ha": 5296,
+     "detections": 70
+    },
+    "24": {
+     "recall": 0.375,
+     "precision": 0.715,
+     "f1": 0.492,
+     "pred_ha": 5226,
+     "seen_ha": 11196,
+     "detections": 546
+    },
+    "30": {
+     "recall": 0.406,
+     "precision": 0.636,
+     "f1": 0.496,
+     "pred_ha": 6847,
+     "seen_ha": 11815,
+     "detections": 629
+    }
+   },
+   "ms": 19
+  },
+  "alexandroupolis": {
+   "split": "train",
+   "note": "Greece, pine and shrub",
+   "seeds": 5,
+   "hours": {
+    "12": {
+     "recall": 0.203,
+     "precision": 0.703,
+     "f1": 0.315,
+     "pred_ha": 952,
+     "seen_ha": 4743,
+     "detections": 148
+    },
+    "24": {
+     "recall": 0.287,
+     "precision": 0.608,
+     "f1": 0.39,
+     "pred_ha": 2083,
+     "seen_ha": 6121,
+     "detections": 258
+    },
+    "30": {
+     "recall": 0.224,
+     "precision": 0.591,
+     "f1": 0.325,
+     "pred_ha": 2428,
+     "seen_ha": 7249,
+     "detections": 353
+    }
+   },
+   "ms": 10
+  },
+  "tenerife": {
+   "split": "train",
+   "note": "Canary Islands, pine, steep",
+   "seeds": 103,
+   "hours": {
+    "12": {
+     "recall": 0.825,
+     "precision": 0.71,
+     "f1": 0.764,
+     "pred_ha": 4006,
+     "seen_ha": 3521,
+     "detections": 63
+    },
+    "24": {
+     "recall": 0.817,
+     "precision": 0.556,
+     "f1": 0.662,
+     "pred_ha": 7055,
+     "seen_ha": 5357,
+     "detections": 219
+    },
+    "30": {
+     "recall": 0.841,
+     "precision": 0.556,
+     "f1": 0.669,
+     "pred_ha": 9461,
+     "seen_ha": 7230,
+     "detections": 454
+    }
+   },
+   "ms": 24
+  },
+  "jasper": {
+   "split": "train",
+   "note": "Canada, boreal conifer",
+   "seeds": 2,
+   "hours": {
+    "12": {
+     "recall": 0.113,
+     "precision": 0.53,
+     "f1": 0.186,
+     "pred_ha": 632,
+     "seen_ha": 8337,
+     "detections": 354
+    },
+    "24": {
+     "recall": 0.168,
+     "precision": 0.508,
+     "f1": 0.252,
+     "pred_ha": 3704,
+     "seen_ha": 18050,
+     "detections": 1533
+    },
+    "30": {
+     "recall": 0.197,
+     "precision": 0.508,
+     "f1": 0.284,
+     "pred_ha": 4856,
+     "seen_ha": 18050,
+     "detections": 1533
+    }
+   },
+   "ms": 28
+  },
+  "uiseong": {
+   "split": "train",
+   "note": "Korea, pine hills",
+   "seeds": 13,
+   "hours": {
+    "12": {
+     "recall": 0.104,
+     "precision": 0.473,
+     "f1": 0.171,
+     "pred_ha": 1320,
+     "seen_ha": 5612,
+     "detections": 96
+    },
+    "24": {
+     "recall": 0.292,
+     "precision": 0.654,
+     "f1": 0.404,
+     "pred_ha": 3590,
+     "seen_ha": 9755,
+     "detections": 839
+    },
+    "30": {
+     "recall": 0.359,
+     "precision": 0.686,
+     "f1": 0.471,
+     "pred_ha": 4999,
+     "seen_ha": 10048,
+     "detections": 987
+    }
+   },
+   "ms": 16
+  },
+  "pedrogao": {
+   "split": "train",
+   "note": "Portugal, eucalyptus and pine",
+   "seeds": 1,
+   "hours": {
+    "12": {
+     "recall": null,
+     "precision": 0.11,
+     "f1": null,
+     "pred_ha": 337,
+     "seen_ha": 77,
+     "detections": 0
+    },
+    "24": {
+     "recall": 0.019,
+     "precision": 0.25,
+     "f1": 0.035,
+     "pred_ha": 1495,
+     "seen_ha": 24348,
+     "detections": 894
+    },
+    "30": {
+     "recall": 0.019,
+     "precision": 0.256,
+     "f1": 0.035,
+     "pred_ha": 2428,
+     "seen_ha": 24348,
+     "detections": 894
+    }
+   },
+   "ms": 10
+  },
+  "caldor": {
+   "split": "train",
+   "note": "California, Sierra conifer",
+   "seeds": 15,
+   "hours": {
+    "12": {
+     "recall": 1.0,
+     "precision": 0.405,
+     "f1": 0.577,
+     "pred_ha": 999,
+     "seen_ha": 504,
+     "detections": 14
+    },
+    "24": {
+     "recall": 1.0,
+     "precision": 0.2,
+     "f1": 0.333,
+     "pred_ha": 3766,
+     "seen_ha": 752,
+     "detections": 37
+    },
+    "30": {
+     "recall": 1.0,
+     "precision": 0.185,
+     "f1": 0.312,
+     "pred_ha": 5385,
+     "seen_ha": 996,
+     "detections": 83
+    }
+   },
+   "ms": 14
+  },
+  "norte": {
+   "split": "train",
+   "note": "California (San Clemente), coastal shrub + homes",
+   "seeds": 1,
+   "hours": {
+    "12": {
+     "recall": 0.0,
+     "precision": 0.424,
+     "f1": 0.0,
+     "pred_ha": 121,
+     "seen_ha": 746,
+     "detections": 15
+    },
+    "24": {
+     "recall": 0.654,
+     "precision": 0.5,
+     "f1": 0.567,
+     "pred_ha": 673,
+     "seen_ha": 870,
+     "detections": 26
+    },
+    "30": {
+     "recall": 0.962,
+     "precision": 0.521,
+     "f1": 0.676,
+     "pred_ha": 969,
+     "seen_ha": 870,
+     "detections": 26
+    }
+   },
+   "ms": 5
+  },
+  "arbo": {
+   "split": "test",
+   "note": "Spain (Galicia), shrub and pine, low intensity",
+   "seeds": 4,
+   "hours": {
+    "12": {
+     "recall": null,
+     "precision": 0.491,
+     "f1": null,
+     "pred_ha": 165,
+     "seen_ha": 148,
+     "detections": 0
+    },
+    "24": {
+     "recall": 0.75,
+     "precision": 0.532,
+     "f1": 0.623,
+     "pred_ha": 359,
+     "seen_ha": 470,
+     "detections": 8
+    },
+    "30": {
+     "recall": 0.75,
+     "precision": 0.483,
+     "f1": 0.587,
+     "pred_ha": 588,
+     "seen_ha": 470,
+     "detections": 8
+    }
+   },
+   "ms": 3
+  },
+  "eaton": {
+   "split": "test",
+   "note": "California, chaparral + town, Santa Ana wind",
+   "seeds": 444,
+   "hours": {
+    "12": {
+     "recall": 0.863,
+     "precision": 0.881,
+     "f1": 0.872,
+     "pred_ha": 5937,
+     "seen_ha": 7340,
+     "detections": 380
+    },
+    "24": {
+     "recall": 0.968,
+     "precision": 0.695,
+     "f1": 0.809,
+     "pred_ha": 10064,
+     "seen_ha": 7794,
+     "detections": 556
+    },
+    "30": {
+     "recall": 0.964,
+     "precision": 0.649,
+     "f1": 0.776,
+     "pred_ha": 11284,
+     "seen_ha": 8107,
+     "detections": 835
+    }
+   },
+   "ms": 26
+  },
+  "rhodes": {
+   "split": "test",
+   "note": "Greece, pine and shrub",
+   "seeds": 1,
+   "hours": {
+    "12": {
+     "recall": 0.0,
+     "precision": 0.102,
+     "f1": 0.0,
+     "pred_ha": 435,
+     "seen_ha": 359,
+     "detections": 5
+    },
+    "24": {
+     "recall": 0.844,
+     "precision": 0.5,
+     "f1": 0.628,
+     "pred_ha": 2196,
+     "seen_ha": 1717,
+     "detections": 32
+    },
+    "30": {
+     "recall": 0.844,
+     "precision": 0.439,
+     "f1": 0.577,
+     "pred_ha": 3096,
+     "seen_ha": 1717,
+     "detections": 32
+    }
+   },
+   "ms": 8
+  },
+  "imabari": {
+   "split": "test",
+   "note": "Japan, hills, mixed forest",
+   "seeds": 19,
+   "hours": {
+    "12": {
+     "recall": 0.754,
+     "precision": 0.679,
+     "f1": 0.714,
+     "pred_ha": 698,
+     "seen_ha": 1348,
+     "detections": 69
+    },
+    "24": {
+     "recall": 0.833,
+     "precision": 0.554,
+     "f1": 0.666,
+     "pred_ha": 1103,
+     "seen_ha": 1446,
+     "detections": 90
+    },
+    "30": {
+     "recall": 0.909,
+     "precision": 0.756,
+     "f1": 0.826,
+     "pred_ha": 1200,
+     "seen_ha": 1818,
+     "detections": 176
+    }
+   },
+   "ms": 4
+  },
+  "fort_mcmurray": {
+   "split": "test",
+   "note": "Canada, boreal conifer",
+   "seeds": 2,
+   "hours": {
+    "12": {
+     "recall": 0.088,
+     "precision": 0.282,
+     "f1": 0.134,
+     "pred_ha": 670,
+     "seen_ha": 1302,
+     "detections": 57
+    },
+    "24": {
+     "recall": 0.217,
+     "precision": 0.188,
+     "f1": 0.202,
+     "pred_ha": 2623,
+     "seen_ha": 2099,
+     "detections": 92
+    },
+    "30": {
+     "recall": 0.233,
+     "precision": 0.174,
+     "f1": 0.199,
+     "pred_ha": 3574,
+     "seen_ha": 2299,
+     "detections": 120
+    }
+   },
+   "ms": 17
+  },
+  "albergaria": {
+   "split": "test",
+   "note": "Portugal, eucalyptus",
+   "seeds": 5,
+   "hours": {
+    "12": {
+     "recall": 1.0,
+     "precision": 0.317,
+     "f1": 0.481,
+     "pred_ha": 363,
+     "seen_ha": 196,
+     "detections": 4
+    },
+    "24": {
+     "recall": 0.385,
+     "precision": 0.088,
+     "f1": 0.144,
+     "pred_ha": 2295,
+     "seen_ha": 559,
+     "detections": 13
+    },
+    "30": {
+     "recall": 0.312,
+     "precision": 0.045,
+     "f1": 0.078,
+     "pred_ha": 4516,
+     "seen_ha": 565,
+     "detections": 16
+    }
+   },
+   "ms": 12
+  }
+ }
+}

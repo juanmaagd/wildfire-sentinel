@@ -65,8 +65,9 @@ Try "act now" vs "act in 6 hours" and **see the difference before you send anyon
 ## Proof it works (real fire, real numbers)
 
 We replayed the Ofunato fire with real NASA data.
-- **We tested the model on 18 real fires in 9 countries.** On the 6 it never saw, it finds **54%** of where the satellite saw the fire go in the first 30 hours (33% before calibrating).
-- **Our prediction is "nobody fights it".** At Ofunato it predicted 2,600 to 3,100 hectares at 30 hours; the real fire, with hundreds of firefighters on it, burned 1,200. That gap is what they saved. And it's exactly what our plan tool helps you win faster.
+- **We tested the model on 18 real fires in 9 countries.** On the 6 it never saw, it finds **67%** of where the satellite saw the fire go in the first 30 hours (our first model: 33%).
+- **It adapts to each place:** fuel dries with heat and dry air and gets wet with rain, hour by hour; fire runs uphill; farmland, towns and lakes slow or stop it.
+- **Our prediction is "nobody fights it".** At Ofunato it predicted 3,800 to 4,200 hectares at 30 hours; the real fire, with hundreds of firefighters on it, burned 1,200. That gap is what they saved. And it's exactly what our plan tool helps you win faster.
 
 And Neo4j lets us show **the family tree of the fire**: one single point in the first hour gave birth to **82 more**. Catch that one early, and you cut the main branch.
 
@@ -97,7 +98,7 @@ And Neo4j lets us show **the family tree of the fire**: one single point in the 
 | **< 1 sec** | heat spot → fire alert |
 | **~150 → ~20** | today's heat spots in Japan → the ones worth a look |
 | **18** | real fires in 9 countries the model was tested on |
-| **54%** | of the fire's first 30 h found on fires the model never saw (33% before) |
+| **67%** | of the fire's first 30 h found on fires the model never saw (first model: 33%) |
 | **82** | detections that grew from one single early point |
 | **3 h** | lead time we give crews to cut the firebreak |
 
@@ -120,7 +121,7 @@ And Neo4j lets us show **the family tree of the fire**: one single point in the 
 "It alerts every time the satellite passes, about six times a day, and filters the noise. The next step is Japan's Himawari satellite, every 10 minutes, as the trigger in front of the same system."
 
 **"How do you know the prediction is good?"**
-"We measured it on 18 real fires in 9 countries against what the satellite saw burning. On the 6 it never saw, it finds 54% of the fire in the first 30 hours. It predicts the 'nobody fights it' scenario on purpose, which is exactly what you plan against."
+"We measured it on 18 real fires in 9 countries against what the satellite saw burning. On the 6 it never saw, it finds 67% of the fire in the first 30 hours. It predicts the 'nobody fights it' scenario on purpose, which is exactly what you plan against."
 
 **"Who pays?"**
 "Prefectures and municipalities, per region. The data is free and the AI is cheap, so it's affordable even for small towns."
