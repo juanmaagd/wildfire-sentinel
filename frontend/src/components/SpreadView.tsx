@@ -467,10 +467,10 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-6">
         <div className="pointer-events-auto bg-canvas/80 backdrop-blur-sm px-5 py-4">
-          <div className="font-sans font-normal text-[72px] leading-[0.95] tracking-[-0.03em] text-bone">Predicted spread</div>
-          <div className="mt-1 font-mono text-[13px] uppercase tracking-wider text-ash">
-            3D spread prediction{data?.start ? ` · from satellite pass ${fmtDateTime(fromJst(data.start))}` : ''}
-          </div>
+          <h2 className="font-mono text-[13px] uppercase tracking-wider text-ash">
+            <span className="text-bone">Predicted spread</span>
+            {data?.start ? ` · from satellite pass ${fmtDateTime(fromJst(data.start))}` : ''}
+          </h2>
           {data?.observed && (
             <div className="mt-2 flex gap-4 font-mono text-[12px] uppercase tracking-wider text-ash">
               <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-[#ff8a1f]" />burning at start</span>
@@ -481,7 +481,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
             <div className="mt-3 font-mono text-[13px] uppercase tracking-wider tabular-nums text-bone">
               <span className="text-ash">{fmtDayTime(fromJst(now.time))} {localZone} · +{Math.floor(hour)}h · </span>
               wind {now.wind_speed_ms.toFixed(1)} m/s {compass(now.wind_from_deg)} · gusts {(now.wind_gust_ms ?? 0).toFixed(1)} · RH {Math.round(now.humidity_pct)}%
-              {now.precip_mm >= 0.5 && <span className="ml-2 text-[#6cb6ff]">· raining {now.precip_mm.toFixed(1)} mm/h — spread stalls</span>}
+              {now.precip_mm >= 0.5 && <span className="ml-2 text-[#6cb6ff]">· raining {now.precip_mm.toFixed(1)} mm/h — fuel getting wet</span>}
             </div>
           ) : wind && (
             <div className="mt-3 font-mono text-[13px] uppercase tracking-wider tabular-nums text-lime">
