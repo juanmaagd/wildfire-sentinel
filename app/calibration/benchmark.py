@@ -39,7 +39,7 @@ def _km(a: tuple, b: tuple) -> float:
     return math.hypot((a[0] - b[0]) * 111.2, (a[1] - b[1]) * 111.2 * math.cos(math.radians(a[0])))
 
 
-def track(lat: float, lon: float, day: str) -> dict:
+def track(lat: float, lon: float, day: str, exclude: tuple | None = None) -> dict:
     """One fire's detections: the first pass with a detection near the origin, then detections chained to it.
     A plain bounding box mixes in refineries and neighbouring fires (Palisades started from Torrance refineries)."""
     box = (lon - 0.3, lat - 0.3, lon + 0.3, lat + 0.3)
@@ -47,6 +47,9 @@ def track(lat: float, lon: float, day: str) -> dict:
     rows = sources.fetch_hotspots_multi(box, 5, day, REPLAY_SOURCES) + sources.fetch_hotspots_multi(box, 4, second, REPLAY_SOURCES)
     pts = sorted(((datetime.strptime(f"{r['acq_date']} {int(r['acq_time']):04d}", "%Y-%m-%d %H%M").replace(tzinfo=timezone.utc),
                    float(r["latitude"]), float(r["longitude"])) for r in rows))
+    if exclude:  # a neighbouring fire with its own ignition
+        w, s, e, n = exclude
+        pts = [p for p in pts if not (w <= p[2] <= e and s <= p[1] <= n)]
     near = [t for t, a, b in pts if _km((a, b), (lat, lon)) <= SEED_KM]
     if not near:
         closest = min(pts, key=lambda p: _km(p[1:], (lat, lon)), default=None)
@@ -70,13 +73,16 @@ def load(fire: tuple) -> dict:
     CACHE.mkdir(parents=True, exist_ok=True)
     meta, grid = CACHE / f"{name}.json", CACHE / f"{name}_dem.npz"
     if not meta.exists():
-        ctx = track(lat, lon, day)
+        ctx = track(lat, lon, day, fire[6] if len(fire) > 6 else None)
         s = ctx["seeds"]
         clat, clon = sum(a for a, _ in s) / len(s), sum(b for _, b in s) / len(s)  # grid centered on the first pass
         hourly = sources.hourly_weather(clat, clon, day, 48, ctx["start_jst"])
         rain_7d = sources.weather(clat, clon, day)["rain_7d_mm"]
         meta.write_text(json.dumps({"lat": clat, "lon": clon, **ctx, "hourly": hourly, "rain_7d": rain_7d}))
     data = json.loads(meta.read_text())
+    if data["hourly"] and "temp_c" not in data["hourly"][0]:  # cached before temperature was fetched: refresh weather only
+        data["hourly"] = sources.hourly_weather(data["lat"], data["lon"], day, 48, data["start_jst"])
+        meta.write_text(json.dumps(data))
     if not grid.exists():
         dem, cell_m, ox, oy = spread._dem(data["lat"], data["lon"])
         np.savez_compressed(grid, dem=dem, meta=np.array([cell_m, ox, oy]))
