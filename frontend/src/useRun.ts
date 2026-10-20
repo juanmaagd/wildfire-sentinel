@@ -83,7 +83,12 @@ export function useRun() {
         handle(runId, name, data)
       })
     }
-    es.addEventListener('done', () => handle(runId, 'done', {}))
+    es.addEventListener('done', () => {
+      // The server closes the stream right after "done". While paused, "done" waits in the buffer, so close the
+      // stream now: otherwise that close reads as a failure (and EventSource would reconnect into a new run).
+      if (pausedRef.current && esRef.current === es) closeStream()
+      handle(runId, 'done', {})
+    })
     // Server-sent "error" events carry data; connection failures do not.
     // Never let EventSource auto-reconnect: that would start a new run.
     es.addEventListener('error', (e) => {
