@@ -18,6 +18,7 @@ REPLAY_START = "2025-02-26"
 REPLAY_DAYS = 9  # 2025-02-26 → 03-06: ignition, growth, decline, extinguished by the 03-05 rain
 # Combining the three VIIRS satellites shows the whole fire lifecycle (NOAA-20 alone misses 03-02..03-04).
 REPLAY_SOURCES = ("VIIRS_NOAA20_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA21_NRT")
+LIVE_SOURCES = ("VIIRS_NOAA20_NRT", "VIIRS_SNPP_NRT", "VIIRS_NOAA21_NRT")  # three VIIRS passes; the same fire seen twice is merged
 
 # Drill: an everyday wildland-urban fire — a small brush fire on the forested slope right above
 # central Ashikaga (site of the 2021 Mt. Ryogai fire), run with today's live weather forecast.

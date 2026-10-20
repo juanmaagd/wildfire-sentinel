@@ -220,15 +220,18 @@ def hourly_weather(lat: float, lon: float, day: str | None, hours: int = 168, st
     ]
 
 
-def fetch_hotspots_multi(bbox: tuple[float, float, float, float], days: int, on_date: str, srcs: tuple[str, ...]) -> list[dict]:
-    """Archive detections from several satellites (failures of one source are skipped)."""
-    rows: list[dict] = []
-    for src in srcs:
+def fetch_hotspots_multi(bbox: tuple[float, float, float, float], days: int, on_date: str | None,
+                         srcs: tuple[str, ...]) -> list[dict]:
+    """Detections from several satellites, fetched in parallel (failures of one source are skipped).
+    `cluster_hotspots` then merges the same fire seen by more than one of them."""
+    def one(src: str) -> list[dict]:
         try:
-            rows += fetch_hotspots(bbox, days, on_date=on_date, source=src)
+            return fetch_hotspots(bbox, days, on_date=on_date, source=src)
         except (httpx.HTTPError, RuntimeError):
-            continue
-    return rows
+            return []
+
+    with ThreadPoolExecutor(len(srcs)) as pool:
+        return [row for rows in pool.map(one, srcs) for row in rows]
 
 
 def daily_rain(lat: float, lon: float, start: str, end: str) -> dict[str, float]:

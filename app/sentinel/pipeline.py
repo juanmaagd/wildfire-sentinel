@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Awaitable, Callable
 
 from . import analyst, jev, memory, scoring, sources
-from .config import DRILL, JAPAN_BBOX, OFUNATO_BBOX, REPLAY_DAYS, REPLAY_SOURCES, REPLAY_START
+from .config import DRILL, JAPAN_BBOX, LIVE_SOURCES, OFUNATO_BBOX, REPLAY_DAYS, REPLAY_SOURCES, REPLAY_START
 
 Emit = Callable[[str, dict], Awaitable[None]]
 
@@ -228,7 +228,7 @@ class Run:
                                     detections=DRILL["detections"])
                 await self.batch([h], mem, jv, None)
             else:
-                rows = await asyncio.to_thread(sources.fetch_hotspots, self.bbox, 2)
+                rows = await asyncio.to_thread(sources.fetch_hotspots_multi, self.bbox, 2, None, LIVE_SOURCES)
                 hotspots = sources.cluster_hotspots(rows)  # strongest FRP first
                 self.stats["skipped_weak"] = max(0, len(hotspots) - LIVE_MAX)
                 await self.batch(hotspots[:LIVE_MAX], mem, jv, None)
