@@ -1,0 +1,15 @@
+.env
+.git
+**/.venv
+**/__pycache__
+**/node_modules
+frontend/dist
+app/.cache
+app/calibration/results
+spike
+docs
+odd
+.claude
+.agents
+.atl
+.playwright-mcp

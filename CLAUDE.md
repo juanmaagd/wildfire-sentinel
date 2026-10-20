@@ -25,6 +25,8 @@ cd frontend && npm run dev      # Vite dev server :5173, proxies /api → :8000
 
 The server serves `frontend/dist` when it exists, otherwise the vanilla fallback UI in `web/`. Both support `?mock=1` (no backend). Keep MapLibre pinned at 5.6.2: v6 ships its worker as an ES module chain that breaks in the Vite production build. Dates show in the viewer's time zone and locale (`lib/format.ts`); the backend still requests Open-Meteo in JST, so naive forecast times go through `fromJst`. The 2D map basemap is OpenFreeMap `dark` (OSM, worldwide, no key); the 3D view layers GSI photos over Esri imagery. Frontend styling follows `frontend/DESIGN.md` through `frontend/STYLE-RULES.md` (Tailwind v4 only; lime is the only UI accent, fire colors only as map data).
 
+Deploy: Dokploy Compose service with compose path `deploy/docker-compose.yml` (app + Neo4j, root `Dockerfile` builds the UI and bakes the embedding model in since the server runs `HF_HUB_OFFLINE=1`). Set `TYPESAFE_API_KEY`, `AIAND_API_KEY`, `MAP_KEYS`, `NEO4J_PASSWORD` (optional `ESRI_API_KEY`) in Dokploy's environment and route the domain to service `app`, port 8000. Linux uses CPU-only torch (`[tool.uv.sources]` in `app/pyproject.toml`). Local smoke test: `NEO4J_PASSWORD=x TYPESAFE_API_KEY=x AIAND_API_KEY=x MAP_KEYS=x docker compose -f deploy/docker-compose.yml -p sentinel-smoke up -d --build`.
+
 Restart uvicorn after backend edits (no reload). The server warms up the embedding model at startup; the first run hangs without it.
 
 ## Secrets
