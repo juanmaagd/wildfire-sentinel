@@ -147,7 +147,7 @@ export default function FireGraphView({ lat, lon, day, name, onClose }: Props) {
   const fast = ins?.fastest[0]
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-canvas">
+    <div className="fixed inset-0 z-50 flex flex-col bg-canvas sm:flex-row">
       <div className="relative min-w-0 flex-1">
         {data && (
           <InteractiveNvlWrapper
@@ -178,14 +178,14 @@ export default function FireGraphView({ lat, lon, day, name, onClose }: Props) {
           </div>
         )}
 
-        <div className="pointer-events-none absolute left-6 top-6 bg-canvas/80 px-5 py-4 backdrop-blur-sm">
-          <div className="text-[56px] font-normal leading-[0.95] tracking-[-0.03em] text-bone">Fire graph</div>
+        <div className="pointer-events-none absolute left-3 right-3 top-3 bg-canvas/80 px-4 py-3 backdrop-blur-sm sm:left-6 sm:right-auto sm:top-6 sm:px-5 sm:py-4">
+          <div className="text-[32px] sm:text-[56px] font-normal leading-[0.95] tracking-[-0.03em] text-bone">Fire graph</div>
           <div className="mt-1 font-mono text-[13px] uppercase tracking-wider text-ash">
             {name} · propagation graph in Neo4j{data ? ` · ${data.nodes.length} nodes · ${data.rels.length} relationships` : ''}
           </div>
         </div>
 
-        <div className="absolute bottom-6 left-6 flex flex-wrap items-center gap-4 bg-canvas/85 px-3 py-2 font-mono text-[12px] uppercase tracking-wider text-ash backdrop-blur-sm">
+        <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-x-4 gap-y-1 bg-canvas/85 sm:bottom-6 sm:left-6 sm:right-auto px-3 py-2 font-mono text-[12px] uppercase tracking-wider text-ash backdrop-blur-sm">
           <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-[#ffd000]" />first hours</span>
           <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-[#8b1010]" />days later</span>
           <span className="inline-flex items-center gap-2"><i className="h-[2px] w-4 bg-[#ff8a1f]" />spread_to</span>
@@ -200,7 +200,7 @@ export default function FireGraphView({ lat, lon, day, name, onClose }: Props) {
         </div>
       </div>
 
-      <aside className="flex w-[420px] shrink-0 flex-col border-l border-iron">
+      <aside className="flex h-[45%] w-full shrink-0 flex-col border-t border-iron sm:h-auto sm:w-[420px] sm:border-l sm:border-t-0">
         <div className="flex items-center justify-between border-b border-iron px-5 py-4 font-mono text-[12px] uppercase tracking-wider text-ash">
           <span>What the graph tells us</span>
           <button type="button" onClick={onClose} className="flex items-center gap-2 text-bone hover:text-lime">

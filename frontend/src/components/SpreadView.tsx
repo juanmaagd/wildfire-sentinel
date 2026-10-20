@@ -209,6 +209,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
     mapRef.current = map
 
     map.on('load', () => {
+      el.current?.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show') // keep it behind its (i) on phones
       map.setTerrain({ source: 'dem', exaggeration: 1.5 })
       map.addSource('perim', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('head', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
@@ -465,14 +466,14 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
         <div ref={el} className="h-full w-full" />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-6">
-        <div className="pointer-events-auto bg-canvas/80 backdrop-blur-sm px-5 py-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 sm:p-6">
+        <div className="pointer-events-auto min-w-0 bg-canvas/80 px-3 py-3 backdrop-blur-sm sm:px-5 sm:py-4">
           <h2 className="font-mono text-[13px] uppercase tracking-wider text-ash">
             <span className="text-bone">Predicted spread</span>
             {data?.start ? ` · from satellite pass ${fmtDateTime(fromJst(data.start))}` : ''}
           </h2>
           {data?.observed && (
-            <div className="mt-2 flex gap-4 font-mono text-[12px] uppercase tracking-wider text-ash">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[12px] uppercase tracking-wider text-ash">
               <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-[#ff8a1f]" />burning at start</span>
               <span className="inline-flex items-center gap-2"><i className="size-2 rounded-full bg-bone" />real detections later</span>
             </div>
@@ -495,14 +496,14 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
         <button
           type="button"
           onClick={onClose}
-          className="pointer-events-auto flex items-center gap-2 border border-iron text-bone font-mono text-[13px] uppercase tracking-wider px-[14px] py-[10px] rounded-[3.6px] hover:border-bone"
+          className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-[3.6px] border border-iron bg-canvas/80 px-[14px] py-[10px] font-mono text-[13px] uppercase tracking-wider text-bone hover:border-bone"
         >
           <X size={18} /> Close
         </button>
       </div>
 
       {plan && showPlan && (
-        <aside className="absolute bottom-6 right-6 top-[96px] flex w-[400px] flex-col bg-canvas/90 backdrop-blur-sm">
+        <aside className="absolute inset-x-3 bottom-3 top-[72px] z-10 flex flex-col bg-canvas/95 backdrop-blur-sm sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-[96px] sm:w-[400px] sm:bg-canvas/90">
           <div className="flex items-start justify-between gap-3 border-b border-iron px-4 py-3 font-mono text-[12px] uppercase tracking-wider text-ash">
             <span>Plan P{(active ?? 0) + 1} · decided at +{plan.at_hour}h{plan.plan_time ? ` · ${fmtDayTime(fromJst(plan.plan_time))} ${localZone}` : ''}</span>
             <button
@@ -566,8 +567,8 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
       )}
 
       {data && (
-        <div className={`absolute inset-x-0 bottom-0 p-6 ${plan && showPlan ? 'pr-[448px]' : ''}`}>
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 bg-canvas/80 backdrop-blur-sm px-5 py-3">
+        <div className={`absolute inset-x-0 bottom-0 px-3 pb-10 pt-3 sm:p-6 ${plan && showPlan ? 'sm:pr-[448px]' : ''}`}>
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 bg-canvas/80 px-3 py-3 backdrop-blur-sm sm:px-5">
             {data.weather_hourly && data.weather_hourly.length > 1 && (
               <div className="w-full">
                 <WeatherTimeline
@@ -672,7 +673,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
               )}
             </div>
             <div className="ml-auto text-right">
-              <div className="font-mono font-light text-[40px] leading-none text-bone">
+              <div className="font-mono text-[28px] font-light leading-none text-bone sm:text-[40px]">
                 {area ? area.toFixed(1) : '0.0'} <span className="font-mono text-lg text-ash">ha</span>
               </div>
               {showPlan && planArea !== undefined && baseArea > planArea && (

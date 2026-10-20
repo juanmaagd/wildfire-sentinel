@@ -46,6 +46,7 @@ interface Props {
   onSelect: (id: string) => void
   onAnalyze: (bbox: string) => void // "west,south,east,north" of the current view
   busy: boolean // a run is in progress: hide "Search this area"
+  scanRequest?: number // bump to search the current view (walkthrough CTA)
 }
 
 const incidentGeo = (incidents: Incident[]): FeatureCollection => ({
@@ -62,7 +63,7 @@ const DOT_FILTER = {
   nonfire: ['!=', ['get', 'verdict'], 'possible_fire'],
 } as const
 
-export default function HotspotMap({ sites, incidents, filter, selectedId, fly, onSelect, onAnalyze, busy }: Props) {
+export default function HotspotMap({ sites, incidents, filter, selectedId, fly, onSelect, onAnalyze, busy, scanRequest = 0 }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const loaded = useRef(false)
@@ -117,6 +118,8 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
 
     map.on('load', () => {
       checkSpan()
+      // Compact attribution starts expanded and covers the bottom controls on phones; keep it behind its (i).
+      el.current?.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show')
       locate(map)
       map.addSource('hot', { type: 'geojson', data: EMPTY })
       map.addSource('inc', { type: 'geojson', data: EMPTY })
@@ -205,6 +208,14 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
     if (busy) setMoved(false)
   }, [busy])
 
+  // Too wide to search (no location yet): show the "Zoom in to search" pill instead.
+  useEffect(() => {
+    if (!scanRequest || !mapRef.current) return
+    if (tooWide) setMoved(true)
+    else analyze()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanRequest])
+
   // Fly to the user's position (the browser asks for permission once); denied or unavailable keeps the current view.
   function locate(map = mapRef.current) {
     if (!map || !('geolocation' in navigator)) return
@@ -249,7 +260,7 @@ export default function HotspotMap({ sites, incidents, filter, selectedId, fly, 
           type="button"
           onClick={analyze}
           disabled={tooWide}
-          className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-2 bg-lime px-4 py-2 font-mono text-[12px] uppercase tracking-wider text-canvas shadow-lg hover:brightness-110 disabled:bg-iron disabled:text-ash disabled:hover:brightness-100"
+          className="absolute left-1/2 top-[136px] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap bg-lime sm:top-4 px-4 py-2 font-mono text-[12px] uppercase tracking-wider text-canvas shadow-lg hover:brightness-110 disabled:bg-iron disabled:text-ash disabled:hover:brightness-100"
         >
           <Search className="size-4" aria-hidden />
           {tooWide ? 'Zoom in to search' : 'Search this area'}

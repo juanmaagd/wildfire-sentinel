@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, X } from 'lucide-react'
 
 interface Props {
   onClose: () => void
+  onLive: () => void
   onReplay: () => void
 }
 
@@ -50,15 +51,15 @@ const STEPS: Step[] = [
     label: 'How to use it',
     title: 'Start exploring',
     body: [
-      'Pan the map anywhere and press Search this area to scan it with live satellite data.',
+      'Scan the live fires around you, or pan the map anywhere and press Search this area.',
       'Open a fire from the Fires panel to read its report, then press 3D spread prediction.',
-      'Or watch Replay · Ofunato: the 2025 Ofunato fire in Japan, day by day.',
+      'To see a whole fire unfold, watch Replay · Ofunato: the 2025 Ofunato fire in Japan, day by day.',
     ],
   },
 ]
 
 // First-visit walkthrough (the app has no landing page). Arrows / Esc on the keyboard.
-export default function Intro({ onClose, onReplay }: Props) {
+export default function Intro({ onClose, onLive, onReplay }: Props) {
   const [i, setI] = useState(0)
   const last = i === STEPS.length - 1
   const step = STEPS[i]
@@ -117,8 +118,8 @@ export default function Intro({ onClose, onReplay }: Props) {
           </button>
           {last ? (
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={onClose} className={ghost}>Explore the map</button>
-              <button type="button" onClick={onReplay} className={primary}>Watch the replay</button>
+              <button type="button" onClick={onReplay} className={ghost}>Watch the replay</button>
+              <button type="button" onClick={onLive} className={primary}>Scan live fires</button>
             </div>
           ) : (
             <button type="button" onClick={() => setI(i + 1)} className={primary}>

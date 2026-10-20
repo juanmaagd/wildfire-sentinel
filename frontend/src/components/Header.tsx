@@ -25,12 +25,12 @@ export default function Header({ status, statusText, mode, day, onStart, isMock,
         ? 'ready'
         : `${day ? `day ${day.index}/${day.of} · ` : ''}${paused ? 'paused' : running ? 'live' : 'done'}`
   return (
-    <header className="flex items-center gap-4 bg-canvas/85 py-2 pl-2 pr-4 backdrop-blur-sm">
+    <header className="flex max-w-full items-center gap-3 whitespace-nowrap bg-canvas/85 py-2 pl-2 pr-3 backdrop-blur-sm sm:gap-4 sm:pr-4">
       <div className="flex items-center gap-2">
         <span className="flex size-7 items-center justify-center bg-lime">
           <span className="size-2.5 bg-canvas" />
         </span>
-        <span className="text-[15px] font-normal tracking-[-0.03em]">Wildfire Sentinel{isMock ? ' · mock' : ''}</span>
+        <span className="hidden text-[15px] font-normal tracking-[-0.03em] sm:inline">Wildfire Sentinel{isMock ? ' · mock' : ''}</span>
       </div>
 
       <nav className="flex border border-iron" aria-label="Mode">

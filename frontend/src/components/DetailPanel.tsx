@@ -125,7 +125,7 @@ export default function DetailPanel({ site, lang, setLang, badImages, onBadImage
     <div className="space-y-4 p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className={`font-sans font-normal text-[28px] leading-[1.05] tracking-[-0.03em] text-bone ${ja && written ? 'font-jp' : ''}`}>{headline}</h3>
+          <h3 className={`font-sans font-normal text-[22px] leading-[1.05] sm:text-[28px] tracking-[-0.03em] text-bone ${ja && written ? 'font-jp' : ''}`}>{headline}</h3>
           <div className="mt-2 font-mono text-sm text-ash">
             {siteCoord(site)}
             {when && ` · ${when}`}

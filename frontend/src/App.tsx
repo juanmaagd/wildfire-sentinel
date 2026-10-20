@@ -33,6 +33,7 @@ export default function App() {
   const [introOpen, setIntroOpen] = useState(() => {
     try { return localStorage.getItem('intro-seen') !== '1' } catch { return true }
   })
+  const [scanRequest, setScanRequest] = useState(0)
   const closeIntro = useCallback(() => {
     setIntroOpen(false)
     try { localStorage.setItem('intro-seen', '1') } catch { /* private mode */ }
@@ -135,13 +136,13 @@ export default function App() {
     <div className="flex h-full flex-col">
 
 
-      {introOpen && <Intro onClose={closeIntro} onReplay={() => { closeIntro(); if (state.status !== 'running') start('replay') }} />}
+      {introOpen && <Intro onClose={closeIntro} onLive={() => { closeIntro(); if (state.status !== 'running') setScanRequest((n) => n + 1) }} onReplay={() => { closeIntro(); if (state.status !== 'running') start('replay') }} />}
       <main className="relative min-h-0 flex-1">
         {/* The map is the protagonist: full-bleed, everything else floats over it and can be collapsed. */}
-        <HotspotMap sites={sites} incidents={incidents} filter={filter} selectedId={state.selectedId} fly={fly} onSelect={(id) => pickFromList(id)} onAnalyze={(b) => start('live', b)} busy={state.status === 'running'} />
+        <HotspotMap sites={sites} incidents={incidents} filter={filter} selectedId={state.selectedId} fly={fly} onSelect={(id) => pickFromList(id)} onAnalyze={(b) => start('live', b)} busy={state.status === 'running'} scanRequest={scanRequest} />
 
         {/* Floating top-left column: product bar (no page header) + compact KPI strip. */}
-        <div className="absolute left-4 top-4 flex flex-col items-start gap-2">
+        <div className="absolute left-4 right-4 top-4 flex flex-col items-start gap-2 sm:right-auto">
           <Header
             status={state.status}
             statusText={state.statusText}
@@ -157,7 +158,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setKpisOpen((v) => !v)}
-            className="flex items-center gap-6 px-4 py-3 font-mono text-left"
+            className="flex items-center gap-4 px-3 py-2 font-mono text-left sm:gap-6 sm:px-4 sm:py-3"
             aria-expanded={kpisOpen}
           >
             <Stat label="Hotspots" value={state.stats.total} />
@@ -166,7 +167,7 @@ export default function App() {
             <ChevronDown className={`size-4 text-ash transition-transform ${kpisOpen ? 'rotate-180' : ''}`} />
           </button>
           {kpisOpen && (
-            <div className="w-[520px] border-t border-iron p-4">
+            <div className="w-[min(520px,calc(100vw-32px))] border-t border-iron p-4">
               <Kpis stats={state.stats} alerts={alerts.length} />
             </div>
           )}
@@ -178,17 +179,18 @@ export default function App() {
           <button
             type="button"
             onClick={() => { pickFromList(toast.id); setToastId(null) }}
-            className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 border border-lime bg-canvas/90 px-4 py-3 font-mono text-[13px] uppercase tracking-wider text-bone backdrop-blur-sm"
+            className="absolute bottom-16 left-1/2 flex max-w-[calc(100%-32px)] -translate-x-1/2 items-center gap-3 whitespace-nowrap border sm:bottom-6 border-lime bg-canvas/90 px-4 py-3 font-mono text-[13px] uppercase tracking-wider text-bone backdrop-blur-sm"
           >
             <span className="size-2 animate-pulse rounded-full bg-[#ff3b1f]" />
             <span className="text-lime">Alert</span>
-            <span>new fire #{alerts.length} · {toast.hotspot ? `${toast.hotspot.lat.toFixed(3)}, ${toast.hotspot.lon.toFixed(3)}` : ''}</span>
+            <span>new fire #{alerts.length}<span className="hidden sm:inline"> · {toast.hotspot ? `${toast.hotspot.lat.toFixed(3)}, ${toast.hotspot.lon.toFixed(3)}` : ''}</span></span>
             <span className="text-ash">open →</span>
           </button>
         )}
 
         {/* Floating controls (top-right): alerts drawer + activity toggle. */}
-        <div className="absolute right-4 top-4 flex gap-2">
+        {/* Mobile: below the header, next to the KPI strip. */}
+        <div className="absolute right-4 top-[68px] flex gap-2 sm:top-4">
           <button
             type="button"
             onClick={() => setAlertsOpen((v) => !v)}
@@ -199,7 +201,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setFeedOpen((v) => !v)}
-            className={`rounded-[3.6px] border px-[14px] py-[10px] font-mono text-[13px] uppercase tracking-wider backdrop-blur-sm ${feedOpen ? 'border-lime bg-canvas/90 text-lime' : 'border-iron bg-canvas/85 text-bone hover:border-bone'}`}
+            className={`hidden rounded-[3.6px] border px-[14px] py-[10px] font-mono text-[13px] uppercase tracking-wider backdrop-blur-sm sm:block ${feedOpen ? 'border-lime bg-canvas/90 text-lime' : 'border-iron bg-canvas/85 text-bone hover:border-bone'}`}
           >
             Activity
           </button>
@@ -207,7 +209,7 @@ export default function App() {
 
         {/* Alerts drawer (right). */}
         {alertsOpen && !selected && (
-          <aside className="absolute bottom-4 right-4 top-[72px] flex w-[420px] flex-col border border-iron bg-canvas/95 backdrop-blur-sm">
+          <aside className="absolute bottom-4 left-4 right-4 top-[60px] z-10 flex flex-col sm:left-auto sm:top-[72px] sm:w-[420px] border border-iron bg-canvas/95 backdrop-blur-sm">
             <div className="flex items-center justify-between border-b border-iron px-4 py-3 font-mono text-[13px] uppercase tracking-wider text-ash">
               <span>Fires · {alerts.length}</span>
               <button type="button" onClick={() => setAlertsOpen(false)} aria-label="Close alerts"><X className="size-4" /></button>
@@ -236,7 +238,7 @@ export default function App() {
 
         {/* Detail drawer (right) — opens when an alert or marker is selected. */}
         {selected && (
-          <aside className="absolute bottom-4 right-4 top-[72px] flex w-[520px] flex-col border border-iron bg-canvas/95 backdrop-blur-sm">
+          <aside className="absolute bottom-4 left-4 right-4 top-[60px] z-10 flex flex-col sm:left-auto sm:top-[72px] sm:w-[520px] border border-iron bg-canvas/95 backdrop-blur-sm">
             <div className="flex items-center justify-between border-b border-iron px-4 py-3 font-mono text-[13px] uppercase tracking-wider text-ash">
               <span>Site detail</span>
               <button type="button" onClick={() => select(null)} aria-label="Close detail"><X className="size-4" /></button>
@@ -261,7 +263,7 @@ export default function App() {
 
         {/* Activity feed (bottom-left), collapsed by default. */}
         {feedOpen && (
-          <div className="absolute bottom-12 left-4 h-56 w-[560px] border border-iron bg-canvas/95 backdrop-blur-sm">
+          <div className="absolute bottom-12 left-4 h-56 w-[min(560px,calc(100vw-32px))] border border-iron bg-canvas/95 backdrop-blur-sm">
             <Feed items={state.feed} />
           </div>
         )}
@@ -281,10 +283,10 @@ export default function App() {
               </button>
             ))}
           </div>
-          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full bg-[#ff3b1f]" />fire</span>
-          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full bg-ash" />industrial</span>
-          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full bg-iron" />water/other</span>
-          <span className="inline-flex items-center gap-2 text-ash"><i className="size-2 rounded-full border border-lime" />memory</span>
+          <span className="hidden items-center gap-2 text-ash sm:inline-flex"><i className="size-2 rounded-full bg-[#ff3b1f]" />fire</span>
+          <span className="hidden items-center gap-2 text-ash sm:inline-flex"><i className="size-2 rounded-full bg-ash" />industrial</span>
+          <span className="hidden items-center gap-2 text-ash sm:inline-flex"><i className="size-2 rounded-full bg-iron" />water/other</span>
+          <span className="hidden items-center gap-2 text-ash sm:inline-flex"><i className="size-2 rounded-full border border-lime" />memory</span>
         </div>
       </main>
 
@@ -315,7 +317,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
   return (
     <span className="flex flex-col">
       <span className="text-[11px] uppercase tracking-wider text-ash">{label}</span>
-      <span className={`text-[28px] font-light leading-none ${accent ? 'text-lime' : 'text-bone'}`}>{value}</span>
+      <span className={`text-[22px] font-light leading-none sm:text-[28px] ${accent ? 'text-lime' : 'text-bone'}`}>{value}</span>
     </span>
   )
 }
