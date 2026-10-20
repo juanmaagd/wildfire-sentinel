@@ -211,15 +211,13 @@ En Ofunato arrancamos la predicción con el primer pase del satélite (27/02, 00
 
 | Momento | Oficial | Predicción |
 | --- | --- | --- |
-| +30 h (28/02 a la mañana, NHK) | 1.200 ha | **1.139 ha (−5 %)** |
-| 03/03 (Yomiuri) | 2.100 ha | ~2× |
-| 05/03 6:00 (Iwate) | 2.900 ha | ~1,8× |
-| Final (ciudad de Ofunato) | 3.370 ha | 1,65× |
+| +30 h (28/02 a la mañana, NHK) | 1.200 ha | 2.600–3.100 ha (×2,2–2,6) |
+| 03/03 (Yomiuri) | 2.100 ha | ~×3,7 |
+| 05/03 6:00 (Iwate) | 2.900 ha | ~×3,8 |
+| Final (ciudad de Ofunato) | 3.370 ha | ~×3,4 |
 
-- **El dato para mostrar:** a las 30 horas la predicción acierta el tamaño con un 5 % de error.
-- **Después sobreestima** (hasta el doble) porque el modelo **no simula a los bomberos** apagando el fuego. Lo mostramos igual: es más creíble.
-- **94 % de las 232 detecciones satelitales posteriores** caen dentro de la zona predicha, pero **un círculo del mismo tamaño también contiene el 94 %**. No hay que vender que acertamos la forma: lo que valida es el tamaño en las primeras 30 h.
-- La velocidad del modelo (`SPEED = 0,20`) se **calibró con Ofunato**, así que es un ajuste, no una validación independiente. Es un modelo simple, no un simulador profesional como FARSITE.
+- La predicción es el incendio **sin bomberos**; las cifras oficiales incluyen la extinción, así que la diferencia es lo que salvaron los bomberos más el error del modelo. El rango a +30 h depende del hotspot que abras.
+- La velocidad del modelo (`SPEED = 0,45`) se **calibró con 18 incendios de 9 países**, comparando las primeras 30 h con lo que vio el satélite (`docs/16-spread-calibration.md`). En los 6 incendios que no se usaron para ajustar, encuentra el 54 % del fuego (antes 33 %). Es un modelo simple, no un simulador profesional como FARSITE.
 - En el Replay se usa el combustible con el que se calibró (bosque de coníferas). La foto de un solo punto no representa un incendio de 3.000 ha.
 
 ---

@@ -64,3 +64,7 @@ Two things explain this:
 - The official areas include firefighting, while the benchmark scores what the satellite saw burning.
 
 Raising SPEED also enlarges the "no action" side of the response plans (line km, crews).
+
+## Decision (2026-10-20)
+
+SPEED 0.45 ships. The prediction has to be as realistic as possible, and the model cannot foresee firefighting, so it is calibrated on what the satellite saw burning, not on official areas that include suppression. The pitch (`docs/13`, `docs/14`, `docs/15`) now cites the 18-fire benchmark instead of Ofunato's −5 %; the Ofunato reality check (~2,600–3,100 ha predicted vs 1,200 ha at +30 h, depending on the hotspot opened) is presented as the "nobody fights it" scenario.

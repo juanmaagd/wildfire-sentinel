@@ -65,8 +65,8 @@ Try "act now" vs "act in 6 hours" and **see the difference before you send anyon
 ## Proof it works (real fire, real numbers)
 
 We replayed the Ofunato fire with real NASA data.
-- **30 hours in, we predicted 1,140 hectares. The official figure: 1,200.** 95% on target.
-- After that, the real fire stayed smaller than our prediction, because **our prediction is "nobody fights it"**, and hundreds of firefighters did. That gap is what they saved. And it's exactly what our plan tool helps you win faster.
+- **We tested the model on 18 real fires in 9 countries.** On the 6 it never saw, it finds **54%** of where the satellite saw the fire go in the first 30 hours (33% before calibrating).
+- **Our prediction is "nobody fights it".** At Ofunato it predicted 2,600 to 3,100 hectares at 30 hours; the real fire, with hundreds of firefighters on it, burned 1,200. That gap is what they saved. And it's exactly what our plan tool helps you win faster.
 
 And Neo4j lets us show **the family tree of the fire**: one single point in the first hour gave birth to **82 more**. Catch that one early, and you cut the main branch.
 
@@ -96,7 +96,8 @@ And Neo4j lets us show **the family tree of the fire**: one single point in the 
 | --- | --- |
 | **< 1 sec** | heat spot → fire alert |
 | **~150 → ~20** | today's heat spots in Japan → the ones worth a look |
-| **95%** | Ofunato burned area, predicted vs official at 30 h |
+| **18** | real fires in 9 countries the model was tested on |
+| **54%** | of the fire's first 30 h found on fires the model never saw (33% before) |
 | **82** | detections that grew from one single early point |
 | **3 h** | lead time we give crews to cut the firebreak |
 
@@ -108,7 +109,7 @@ And Neo4j lets us show **the family tree of the fire**: one single point in the 
 2. **3D prediction** → press play → *"This is where it goes if nobody acts."*
 3. **Plan now** → toggle *With plan* → *"Here's the firebreak, two crews, fire stays small."*
 4. Move to +6 h → **Re-plan** → *"Same fire, six hours late: longer line, more crews, bigger fire."*
-5. **Replay · Ofunato** → open it → *"And it works on a real fire: 1,140 predicted, 1,200 real."*
+5. **Replay · Ofunato** → open it → *"A real fire: this is what it does if nobody fights it. The gap to the official dots is what firefighters saved."*
 6. **Fire graph** → *Key spreading point* → *"One early point, 82 more fires. That's the one to stop."*
 
 ---
@@ -119,7 +120,7 @@ And Neo4j lets us show **the family tree of the fire**: one single point in the 
 "It alerts every time the satellite passes, about six times a day, and filters the noise. The next step is Japan's Himawari satellite, every 10 minutes, as the trigger in front of the same system."
 
 **"How do you know the prediction is good?"**
-"Ofunato: 95% on target at 30 hours. After that it's bigger than reality on purpose: it's the 'nobody fights it' scenario, which is exactly what you plan against."
+"We measured it on 18 real fires in 9 countries against what the satellite saw burning. On the 6 it never saw, it finds 54% of the fire in the first 30 hours. It predicts the 'nobody fights it' scenario on purpose, which is exactly what you plan against."
 
 **"Who pays?"**
 "Prefectures and municipalities, per region. The data is free and the AI is cheap, so it's affordable even for small towns."

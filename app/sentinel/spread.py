@@ -20,7 +20,7 @@ from . import landcover, scoring
 TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 ZOOM, TILES, DOWNSAMPLE = 11, 3, 3
 HOURS = (3, 6, 12, 24, 48, 72, 96, 120, 168)
-SPEED = 0.20  # calibrated on the Ofunato replay: 7-day area ~1.9x real, 96% of later detections inside (cautious)
+SPEED = 0.45  # calibrated on 18 fires, first 30 h vs VIIRS (docs/16-spread-calibration.md): test F1 0.386 -> 0.480
 VIIRS_TOLERANCE_CELLS = 2  # ~375 m VIIRS pixel ≈ 2 grid cells
 EARTH = 40075016.686
 

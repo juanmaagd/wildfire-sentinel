@@ -32,8 +32,7 @@ export default function RealityCheck({ points, areaByHour, hour }: Props) {
   const y = (a: number) => H - PAD.b - (a / maxA) * (H - PAD.t - PAD.b)
   const first = points[0]
   const err = first ? Math.round((100 * (first.predicted_ha - first.official_ha)) / first.official_ha) : 0
-  const later = points.slice(1)
-  const worst = later.length ? Math.max(...later.map((p) => p.predicted_ha / p.official_ha)) : 0
+  const worst = points.length ? Math.max(...points.map((p) => p.predicted_ha / p.official_ha)) : 0
 
   return (
     <div className="mt-3 border-t border-iron pt-3">
@@ -76,7 +75,7 @@ export default function RealityCheck({ points, areaByHour, hour }: Props) {
       </div>
       {worst > 1.2 && (
         <div className="mt-1 max-w-[360px] text-[12px] leading-snug text-ash">
-          The curve is the fire with no firefighting: weather and terrain only. After the first day the real fire stayed smaller (up to ×{worst.toFixed(1)} gap); that gap includes the effect of suppression, and model error. Sources: {points.map((p) => p.source).join('; ')}.
+          The curve is the fire with no firefighting: weather and terrain only, calibrated on 18 fires' first 30 h. The real fire stayed smaller (up to ×{worst.toFixed(1)} gap); that gap includes the effect of suppression, and model error. Sources: {points.map((p) => p.source).join('; ')}.
         </div>
       )}
     </div>
