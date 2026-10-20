@@ -570,7 +570,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
         <div className={`absolute inset-x-0 bottom-0 px-3 pb-10 pt-3 sm:p-6 ${plan && showPlan ? 'sm:pr-[448px]' : ''}`}>
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 bg-canvas/80 px-3 py-3 backdrop-blur-sm sm:px-5">
             {data.weather_hourly && data.weather_hourly.length > 1 && (
-              <div className="w-full">
+              <div className="hidden w-full sm:block">
                 <WeatherTimeline
                   hourly={data.weather_hourly}
                   hour={hour}
@@ -600,7 +600,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
             >
               {playing ? <Pause size={22} /> : <Play size={22} />}
             </button>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {steps.map((h, i) => (
                 <button
                   key={h}
@@ -686,7 +686,7 @@ export default function SpreadView({ lat, lon, day, fuel, siteId, focus, forceMo
                   Satellite check · {hits[0]}/{hits[1]} real detections inside ({Math.round((100 * hits[0]) / hits[1])}%)
                 </div>
               )}
-              <div className="font-mono text-xs uppercase text-ash">
+              <div className="hidden font-mono text-xs uppercase text-ash sm:block">
                 {source === 'demo' ? 'Demo model' : data.model ? humanize(data.model) : 'Model output'}
                 {data.elapsed_ms ? ` · ${Math.round(data.elapsed_ms)} ms` : ''}
               </div>
