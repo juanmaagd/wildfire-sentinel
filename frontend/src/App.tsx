@@ -8,6 +8,7 @@ import DetailPanel from './components/DetailPanel'
 import Feed from './components/Feed'
 import SpreadView from './components/SpreadView'
 import FireGraphView from './components/FireGraphView'
+import Intro from './components/Intro'
 import { buildIncidents, type Incident } from './lib/incidents'
 import { urgencyOf } from './lib/format'
 import type { VerdictFilter } from './components/HotspotMap'
@@ -28,6 +29,14 @@ export default function App() {
   const [feedOpen, setFeedOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortKey>('urgency')
   const [toastId, setToastId] = useState<string | null>(null)
+  // First visit opens the walkthrough; the header's help button reopens it.
+  const [introOpen, setIntroOpen] = useState(() => {
+    try { return localStorage.getItem('intro-seen') !== '1' } catch { return true }
+  })
+  const closeIntro = useCallback(() => {
+    setIntroOpen(false)
+    try { localStorage.setItem('intro-seen', '1') } catch { /* private mode */ }
+  }, [])
 
   // Replay start flies the 2D map to Ofunato.
   useEffect(() => {
@@ -126,6 +135,7 @@ export default function App() {
     <div className="flex h-full flex-col">
 
 
+      {introOpen && <Intro onClose={closeIntro} onReplay={() => { closeIntro(); if (state.status !== 'running') start('replay') }} />}
       <main className="relative min-h-0 flex-1">
         {/* The map is the protagonist: full-bleed, everything else floats over it and can be collapsed. */}
         <HotspotMap sites={sites} incidents={incidents} filter={filter} selectedId={state.selectedId} fly={fly} onSelect={(id) => pickFromList(id)} onAnalyze={(b) => start('live', b)} busy={state.status === 'running'} />
@@ -141,6 +151,7 @@ export default function App() {
             isMock={isMock}
             paused={paused}
             onTogglePause={togglePause}
+            onHelp={() => setIntroOpen(true)}
           />
         <div className="bg-canvas/85 backdrop-blur-sm">
           <button

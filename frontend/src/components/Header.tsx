@@ -1,4 +1,4 @@
-import { Pause, Play } from 'lucide-react'
+import { HelpCircle, Pause, Play } from 'lucide-react'
 import type { DayInfo, Mode, RunStatus } from '../types'
 
 interface Props {
@@ -10,12 +10,13 @@ interface Props {
   isMock: boolean
   paused: boolean
   onTogglePause: () => void
+  onHelp: () => void
 }
 
 const LABEL: Record<Mode, string> = { live: 'Live', drill: 'Drill · Ashikaga', replay: 'Replay · Ofunato' }
 
 // Compact floating bar: brand · segmented mode control · short status.
-export default function Header({ status, statusText, mode, day, onStart, isMock, paused, onTogglePause }: Props) {
+export default function Header({ status, statusText, mode, day, onStart, isMock, paused, onTogglePause, onHelp }: Props) {
   const running = status === 'running'
   const short =
     status === 'error'
@@ -67,6 +68,10 @@ export default function Header({ status, statusText, mode, day, onStart, isMock,
         <span className={`size-2 rounded-full ${running && !paused ? 'animate-pulse bg-lime' : paused ? 'bg-lime' : status === 'done' ? 'bg-lime/60' : 'bg-ash'}`} />
         {short}
       </div>
+
+      <button type="button" onClick={onHelp} aria-label="How it works" title="How it works" className="text-ash hover:text-lime">
+        <HelpCircle size={16} />
+      </button>
     </header>
   )
 }
