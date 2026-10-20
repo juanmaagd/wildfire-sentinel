@@ -11,6 +11,7 @@ from pathlib import Path
 import httpx
 from PIL import Image
 
+from . import cache
 from .config import IMAGES_DIR, esri_key, firms_key
 
 FIRMS_URL = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/{source}/{bbox}/{days}"
@@ -62,18 +63,38 @@ def cluster_hotspots(rows: list[dict]) -> list[Hotspot]:
     return sorted(hotspots, key=lambda h: h.frp, reverse=True)
 
 
+FIRMS_LIVE_TTL = 15 * cache.MINUTE  # NRT files update a few times an hour; satellites pass every few hours
+FIRMS_CELL_DEG = 10  # requests cover fixed 10° cells, so every view over the same region reuses them
+
+
 def fetch_hotspots(bbox: tuple[float, float, float, float], days: int, on_date: str | None = None,
                    source: str | None = None) -> list[dict]:
-    """Live: last `days` days (NRT). Archive: `days` days starting at `on_date` (standard processing)."""
+    """Live: last `days` days (NRT). Archive: `days` days starting at `on_date` (standard processing).
+    Fetched per fixed FIRMS_CELL_DEG cell and cached, then cut to `bbox`."""
     source = source or ("VIIRS_NOAA20_SP" if on_date else "VIIRS_NOAA20_NRT")
-    url = FIRMS_URL.format(key=firms_key(), source=source, bbox=",".join(map(str, bbox)), days=days)
-    if on_date:
-        url += f"/{on_date}"
-    resp = httpx.get(url, timeout=60)
-    resp.raise_for_status()
-    if not resp.text.startswith("latitude"):
-        raise RuntimeError(f"FIRMS error: {resp.text[:200]}")
-    return list(csv.DictReader(io.StringIO(resp.text)))
+    w, s, e, n = bbox
+    recent = on_date is None or date.fromisoformat(on_date) > date.today() - timedelta(days=7)
+    c = FIRMS_CELL_DEG
+    cells = [(x, y, x + c, y + c) for x in range(math.floor(w / c) * c, math.ceil(e / c) * c, c)
+             for y in range(math.floor(s / c) * c, math.ceil(n / c) * c, c)]
+
+    def cell(box: tuple[int, int, int, int]) -> list[dict]:
+        def fetch() -> list[dict]:
+            url = FIRMS_URL.format(key=firms_key(), source=source, bbox=",".join(map(str, box)), days=days)
+            if on_date:
+                url += f"/{on_date}"
+            resp = httpx.get(url, timeout=60)
+            resp.raise_for_status()
+            if not resp.text.startswith("latitude"):
+                raise RuntimeError(f"FIRMS error: {resp.text[:200]}")
+            return list(csv.DictReader(io.StringIO(resp.text)))
+
+        params = {"source": source, "bbox": box, "days": days, "on_date": on_date}
+        return cache.cached("firms", params, FIRMS_LIVE_TTL if recent else None, fetch)
+
+    with ThreadPoolExecutor(min(8, len(cells))) as pool:
+        rows = [r for part in pool.map(cell, cells) for r in part]
+    return [r for r in rows if w <= float(r["longitude"]) <= e and s <= float(r["latitude"]) <= n]
 
 
 def _tile_of(lat: float, lon: float, zoom: int) -> tuple[int, int]:
@@ -152,27 +173,39 @@ def satellite_tile(lat: float, lon: float, day: str, name: str, span_deg: float 
     return out
 
 
+def _open_meteo(api: str, params: dict, ttl: float | None, timeout: float = 30) -> dict:
+    """Open-Meteo JSON, cached. Points are snapped to 0.05° (~5 km, finer than its ~10 km model grid) so the
+    hotspots of one fire share a request."""
+    params = {**params, "latitude": round(params["latitude"] * 20) / 20, "longitude": round(params["longitude"] * 20) / 20}
+
+    def fetch() -> dict:
+        resp = httpx.get(f"https://{api}", timeout=timeout, params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+    return cache.cached("open-meteo", {"api": api, **params}, ttl, fetch)
+
+
+OM_FORECAST, OM_ARCHIVE = "api.open-meteo.com/v1/forecast", "archive-api.open-meteo.com/v1/archive"
+
+
 def weather(lat: float, lon: float, day: str | None = None) -> dict:
     """Wind, humidity and 7-day rain. Live: current conditions. Replay: historical at 14:00 JST on `day`."""
     common = {"latitude": lat, "longitude": lon, "timezone": "Asia/Tokyo", "wind_speed_unit": "ms",
               "daily": "precipitation_sum"}
     if day is None:
-        resp = httpx.get("https://api.open-meteo.com/v1/forecast", timeout=20, params={
+        d = _open_meteo(OM_FORECAST, {
             **common, "current": "relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m",
-            "past_days": 7, "forecast_days": 1})
-        resp.raise_for_status()
-        d = resp.json()
+            "past_days": 7, "forecast_days": 1}, 15 * cache.MINUTE, timeout=20)
         now = d["current"]
         rain = d["daily"]["precipitation_sum"][:-1]
         observed_at = now["time"]
         values = now
     else:
         end = date.fromisoformat(day)
-        resp = httpx.get("https://archive-api.open-meteo.com/v1/archive", timeout=20, params={
+        d = _open_meteo(OM_ARCHIVE, {
             **common, "hourly": "relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m",
-            "start_date": (end - timedelta(days=7)).isoformat(), "end_date": day})
-        resp.raise_for_status()
-        d = resp.json()
+            "start_date": (end - timedelta(days=7)).isoformat(), "end_date": day}, None, timeout=20)
         observed_at = f"{day}T14:00"
         idx = d["hourly"]["time"].index(observed_at)
         values = {k: v[idx] for k, v in d["hourly"].items()}
@@ -202,14 +235,13 @@ def hourly_weather(lat: float, lon: float, day: str | None, hours: int = 168, st
         end = day0 + timedelta(days=hours // 24 + 2)
         # The archive lags ~5 days and rejects future dates; a recent fire reads the forecast API, which also
         # serves the last ~3 months.
-        api = "archive-api.open-meteo.com/v1/archive" if end < date.today() - timedelta(days=5) else "api.open-meteo.com/v1/forecast"
-        resp = httpx.get(f"https://{api}", timeout=30, params={**params, "start_date": day, "end_date": end.isoformat()})
+        archived = end < date.today() - timedelta(days=5)
+        h = _open_meteo(OM_ARCHIVE if archived else OM_FORECAST, {**params, "start_date": day, "end_date": end.isoformat()},
+                        None if archived else cache.HOUR)["hourly"]
         first = start or f"{day}T14:00"
     else:
-        resp = httpx.get("https://api.open-meteo.com/v1/forecast", timeout=30, params={**params, "forecast_days": hours // 24 + 2})
+        h = _open_meteo(OM_FORECAST, {**params, "forecast_days": hours // 24 + 2}, cache.HOUR)["hourly"]
         first = datetime.now().strftime("%Y-%m-%dT%H:00")
-    resp.raise_for_status()
-    h = resp.json()["hourly"]
     i0 = h["time"].index(first) if first in h["time"] else 0
     return [
         {"time": h["time"][i], "humidity_pct": h["relative_humidity_2m"][i], "wind_speed_ms": h["wind_speed_10m"][i],
@@ -235,9 +267,6 @@ def fetch_hotspots_multi(bbox: tuple[float, float, float, float], days: int, on_
 
 
 def daily_rain(lat: float, lon: float, start: str, end: str) -> dict[str, float]:
-    resp = httpx.get("https://archive-api.open-meteo.com/v1/archive", timeout=30, params={
-        "latitude": lat, "longitude": lon, "start_date": start, "end_date": end,
-        "daily": "precipitation_sum", "timezone": "Asia/Tokyo"})
-    resp.raise_for_status()
-    d = resp.json()["daily"]
+    d = _open_meteo(OM_ARCHIVE, {"latitude": lat, "longitude": lon, "start_date": start, "end_date": end,
+                                 "daily": "precipitation_sum", "timezone": "Asia/Tokyo"}, None)["daily"]
     return {day: mm or 0.0 for day, mm in zip(d["time"], d["precipitation_sum"])}

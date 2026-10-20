@@ -17,6 +17,7 @@ from PIL import Image
 from skimage import measure
 
 from . import landcover, scoring
+from .config import CACHE_DIR
 
 TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 ZOOM, TILES, DOWNSAMPLE = 11, 3, 3
@@ -24,6 +25,7 @@ HOURS = (3, 6, 12, 24, 48, 72, 96, 120, 168)
 SPEED = 1.0  # calibrated on 18 fires, first 30 h vs VIIRS, with fuel moisture + land cover (docs/16-spread-calibration.md)
 VIIRS_TOLERANCE_CELLS = 2  # ~375 m VIIRS pixel ≈ 2 grid cells
 EARTH = 40075016.686
+DEM_CACHE = CACHE_DIR / "dem"
 
 
 def _merc_px(lat: float, lon: float, z: int) -> tuple[float, float]:
@@ -40,9 +42,14 @@ def _px_to_lonlat(x: float, y: float, z: int) -> tuple[float, float]:
 
 
 def _dem(lat: float, lon: float) -> tuple[np.ndarray, float, float, float]:
-    """Returns (elevation grid, cell size m, origin x px, origin y px) at ZOOM in global pixel space."""
+    """Returns (elevation grid, cell size m, origin x px, origin y px) at ZOOM in global pixel space.
+    Cached on disk per tile block: every point inside the same center tile reuses it."""
     px, py = _merc_px(lat, lon, ZOOM)
     tx0, ty0 = int(px // 256) - TILES // 2, int(py // 256) - TILES // 2
+    path = DEM_CACHE / f"z{ZOOM}_{tx0}_{ty0}.npy"
+    if path.exists():
+        grid = np.load(path)
+        return grid, _cell_m(lat), tx0 * 256.0, ty0 * 256.0
     grid = np.zeros((256 * TILES, 256 * TILES), dtype=np.float32)
 
     def fetch(dy: int, dx: int) -> None:
@@ -55,8 +62,13 @@ def _dem(lat: float, lon: float) -> tuple[np.ndarray, float, float, float]:
         list(pool.map(lambda i: fetch(*divmod(i, TILES)), range(TILES * TILES)))
     h = grid.shape[0] // DOWNSAMPLE
     grid = grid[: h * DOWNSAMPLE, : h * DOWNSAMPLE].reshape(h, DOWNSAMPLE, h, DOWNSAMPLE).mean(axis=(1, 3))
-    cell_m = EARTH * math.cos(math.radians(lat)) / (256 * 2**ZOOM) * DOWNSAMPLE
-    return grid, cell_m, tx0 * 256.0, ty0 * 256.0
+    DEM_CACHE.mkdir(parents=True, exist_ok=True)
+    np.save(path, grid)
+    return grid, _cell_m(lat), tx0 * 256.0, ty0 * 256.0
+
+
+def _cell_m(lat: float) -> float:
+    return EARTH * math.cos(math.radians(lat)) / (256 * 2**ZOOM) * DOWNSAMPLE
 
 
 # Fuel factor per ESA WorldCover group (same scale as scoring.FUEL, 1.0 = conifer forest), cell by cell in production:

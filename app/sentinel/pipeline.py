@@ -174,8 +174,9 @@ class Run:
 
     async def analyse(self, h: sources.Hotspot, mem, jv, day: str | None, batch_detections: int) -> None:
         """Automatic, cheap part: Jev deep probe + rule-based scores. The ai& report is on demand."""
+        fresh = h.id not in ASSESSED  # an alert probed by an earlier run (any user) is reused, no Jev call
         probe_event, assessment = await assess_once(h, mem, jv, day, batch_detections)
-        self.stats["jev_calls"] += 1
+        self.stats["jev_calls"] += fresh
         await self.emit("probe", probe_event)
         await self.emit("report", assessment)
 
