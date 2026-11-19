@@ -21,7 +21,7 @@ Pipeline: **FIRMS** (hotspots) → **GSI** (aerial photo) → **Jev** (triage) �
 | Aerial photo | GSI | ~1 s (9 tiles) | 768 px mosaic |
 | Triage | Jev `jev-1.14.0` | **150–300 ms** | Clear cases conf ≥ 0.9; mixed area conf 0.40 |
 | Escalation | ai& `zai-org/glm-5.3-flash` (vision, strict JSON) | **~4.7 s** | Mixed area → `industrial`, houses within 500 m, with a sensible reason |
-| Alert text | ai& `deepseek-ai/deepseek-v4-flash` (`reasoning_effort="none"`) | **~0.9 s** | 3-line Japanese alert |
+| Alert text | ai& `deepseek-ai/deepseek-v4.1-flash-1017` (`reasoning_effort="none"`) | ~0.9 s on retired v4-flash | 3-line Japanese alert |
 | Memory | neo4j-agent-memory (local Docker) | — | 2nd pass: 100% memory hits, 0 Jev calls |
 
 Notes:
@@ -76,7 +76,7 @@ client = OpenAI(base_url="https://api.aiand.com/v1", api_key=os.environ["AIAND_A
 
 # Vision escalation when Jev confidence is low (model must have the `vision` capability)
 client.chat.completions.create(
-    model="zai-org/glm-5.3-flash",  # or qwen/qwen3.8-27b
+    model="deepseek-ai/deepseek-v4.1-flash-1017",
     messages=[{"role": "user", "content": [
         {"type": "text", "text": "..."},
         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
@@ -85,7 +85,7 @@ client.chat.completions.create(
 )
 
 # Alert text (Japanese) — cheap text model
-client.chat.completions.create(model="deepseek-ai/deepseek-v4-flash", messages=[...])
+client.chat.completions.create(model="deepseek-ai/deepseek-v4.1-flash-1017", messages=[...])
 ```
 
 - Vision input: public URL, base64 data URL, or uploaded `file_id` (Files API, `purpose: "vision"`). PNG/JPEG/WebP/GIF, max 100 MiB.

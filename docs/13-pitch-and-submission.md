@@ -65,7 +65,7 @@ Spoken lines are plain text. Stage directions are in [brackets]. Drill numbers c
 
 Judges from `docs/05`. Their interests are inferred, not confirmed.
 
-- **ai& (Raj Kishan):** Lead with the strict-JSON report and the model split: vision escalation on `glm-5.3-flash`, text on `deepseek-v4-flash`. Say the model never writes numbers or times.
+- **ai& (Raj Kishan):** Lead with the strict-JSON report and the model split: text and the optional aerial photo both on `deepseek-v4.1-flash-1017`. Say the model never writes numbers or times.
 - **Microsoft (Drew Robbins):** Lead with the architecture: three layers, rules in code, and memory as an auditable trail of every verdict.
 - **AlgoMori (Tan):** Lead with the multi-step agent: triage, then fan-out probe, then scoring, then report, then memory ("System 1 / System 2 / Memory").
 - **CEO (Sasha Bogatirev):** Lead with the user (municipal disaster officers) and the value: the model runs only on alerts. Do not quote a price.
@@ -81,7 +81,7 @@ Judges from `docs/05`. Their interests are inferred, not confirmed.
    Stage 2 asks about cloud cover, and the report lists low confidence and the unknowns. **We have not measured how clouds affect detection.** Say so if asked.
 
 3. **What does it cost per day?**
-   Jev runs once per hotspot. Measured: 37 Jev calls for 48 replay hotspots. The ai& calls run only for alerts. Prices: Jev $0.042 per million input tokens, output free (`docs/08`); ai& `deepseek-v4-flash` $0.15 in / $0.25 out per million (`docs/03`). A whole day of testing cost a few cents.
+   Jev runs once per hotspot. Measured: 37 Jev calls for 48 replay hotspots. The ai& calls run only for alerts. Prices: Jev $0.042 per million input tokens, output free (`docs/08`); ai& `deepseek-v4.1-flash-1017` $0.30 in / $0.60 out per million (`docs/03`). A whole day of testing cost a few cents.
 
 4. **What about false negatives?**
    Stage 1 can miss a fire. Mitigations: low Jev confidence escalates to the vision model, and mixed areas get a deep probe (the spike case was confidence 0.40, escalated). **We have no measured miss rate.** Say so.
@@ -117,7 +117,7 @@ Judges from `docs/05`. Their interests are inferred, not confirmed.
 
 **Which sponsor tool you used and how:**
 
-> **ai&:** Situation reports through the OpenAI-compatible API (`api.aiand.com`). Vision escalation uses `zai-org/glm-5.3-flash`. Alert and report text uses `deepseek-ai/deepseek-v4-flash`. Output is strict JSON (`json_schema`). The model writes text only; all numbers and times come from code.
+> **ai&:** Situation reports through the OpenAI-compatible API (`api.aiand.com`). Alert text, the situation report, and the optional aerial photo use `deepseek-ai/deepseek-v4.1-flash-1017`. Output is strict JSON (`json_schema`). The model writes text only; all numbers and times come from code.
 >
 > **ai&** also writes the tactical response plan (anchor point, control line, aerial drops, structure protection, crew safety) from the simulation's numbers, on demand.
 >

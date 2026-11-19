@@ -80,5 +80,5 @@ def alert_text(model: str) -> None:
 
 
 if __name__ == "__main__":
-    escalate(IMAGES / "mosaic_keiyo_refinery.jpg", "zai-org/glm-5.3-flash")
-    alert_text("deepseek-ai/deepseek-v4-flash")
+    escalate(IMAGES / "mosaic_keiyo_refinery.jpg", "deepseek-ai/deepseek-v4.1-flash-1017")
+    alert_text("deepseek-ai/deepseek-v4.1-flash-1017")

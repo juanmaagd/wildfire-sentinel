@@ -9,8 +9,7 @@ from openai import AsyncOpenAI
 
 from .config import aiand_key
 
-VISION_MODEL = "zai-org/glm-5.3-flash"
-TEXT_MODEL = "deepseek-ai/deepseek-v4-flash"
+TEXT_MODEL = "deepseek-ai/deepseek-v4.1-flash-1017"
 
 SYSTEM = (
     "You are a wildfire situation analyst for Japanese municipal disaster-prevention offices. "
@@ -60,20 +59,19 @@ def _ai() -> AsyncOpenAI:
 
 
 async def report(facts: dict, wide_image_path, use_vision: bool = False) -> tuple[dict, str, int]:
-    """Returns (report, model used, latency_ms). Text model by default (fast); vision model optional."""
+    """Returns (report, model used, latency_ms). Optional aerial photo uses the same model."""
     text = json.dumps(facts, ensure_ascii=False, default=str)
     started = time.perf_counter()
     if use_vision:
         b64 = base64.b64encode(wide_image_path.read_bytes()).decode()
         r = await asyncio.wait_for(_ai().chat.completions.create(
-            model=VISION_MODEL,
-            response_format=SCHEMA,
+            model=TEXT_MODEL, response_format=SCHEMA, reasoning_effort="none",
             messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": [
                 {"type": "text", "text": f"Findings:\n{text}\n\nThe image is the wide aerial photo (~7 km across, fire at the center, north up)."},
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
             ]}],
         ), timeout=60)
-        model = VISION_MODEL
+        model = TEXT_MODEL
     else:
         r = await _ai().chat.completions.create(
             model=TEXT_MODEL, response_format=SCHEMA, reasoning_effort="none",

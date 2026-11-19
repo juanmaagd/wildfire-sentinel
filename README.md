@@ -25,8 +25,7 @@ Recommended actions are rule-based. For example, evacuation advice appears only 
 ## Sponsor tools and how we use them
 
 **ai&** (OpenAI-compatible API at `https://api.aiand.com/v1`)
-- `deepseek-ai/deepseek-v4-flash` writes the situation report with a strict JSON schema.
-- `zai-org/glm-5.3-flash` is the vision model. It was verified in the spike but is not on the main path.
+- `deepseek-ai/deepseek-v4.1-flash-1017` writes the situation report with a strict JSON schema. The optional aerial photo uses the same model.
 - The report takes about 5–11 s per alert; the tactical response plan about 6–7 s.
 
 **Neo4j** (neo4j-agent-memory 0.7.0)

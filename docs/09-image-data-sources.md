@@ -43,7 +43,7 @@ GSI tiles are 256 px and Jev needs **280–1568 px per side**, so `spike/gsi.py`
 
 Takeaways:
 - **Latency 150–300 ms per request** including image upload. ✅
-- Land-use judgment works on clear cases; on genuinely mixed areas it is honestly uncertain (low confidence) → use **confidence-gated routing**: low confidence → escalate to an ai& vision model (`glm-5.3-flash` / `qwen3.8-27b`).
+- Land-use judgment works on clear cases; on genuinely mixed areas it is honestly uncertain (low confidence) → use **confidence-gated routing**: low confidence → escalate to ai& `deepseek-v4.1-flash-1017` with the photo attached.
 - Next improvement: ask about **the center of the image** (where the hotspot is), add a `mixed` option, and ask separate Nouls (`storage_tanks`, `factory_roofs`, `forest_within_500m`).
 
 ### End-to-end spike with real data (`spike/triage_test.py`)

@@ -245,7 +245,7 @@ Un bombero no apaga un incendio forestal "con una manguera": arma una **estrateg
 
 - **Informe de situación** (bajo demanda, ~5–11 s): titular, resumen en japonés e inglés, explicación de cada puntuación, evidencia y lo que no se sabe.
 - **Plan táctico** (bajo demanda, ~6–7 s).
-- Usa el modelo `deepseek-v4-flash` con **JSON estricto**: siempre devuelve los mismos campos.
+- Usa el modelo `deepseek-v4.1-flash-1017` con **JSON estricto**: siempre devuelve los mismos campos.
 - Recibe **etiquetas** ("pasto o matorral"), no números de escala, y solo la hora en JST. Así no inventa unidades ni mezcla zonas horarias.
 - ai& corre en GPUs en Japón: los datos quedan en Japón.
 

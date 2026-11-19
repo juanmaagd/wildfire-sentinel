@@ -32,7 +32,7 @@
 - Wi-Fi will be crowded: phone tethering, and consider local Neo4j (Docker) or cached model responses for the demo path.
 - Fragile demo → backup recording + screenshots.
 - Pre-seed demo data; never depend on live typing of long inputs.
-- Use the cheap fast model (`deepseek-v4-flash`) by default so latency doesn't kill the demo.
+- Use the cheap fast model (`deepseek-v4.1-flash-1017`) by default so latency doesn't kill the demo.
 - Power: keep the laptop charged; the demo runs from it.
 
 ## Pitch skeleton (3 min)

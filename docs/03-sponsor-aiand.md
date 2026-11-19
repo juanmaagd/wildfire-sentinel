@@ -34,7 +34,7 @@ ai& sells itself as "the only sovereign AI stack built end-to-end in Japan": up 
 from openai import OpenAI
 client = OpenAI(base_url="https://api.aiand.com/v1", api_key="sk-...")
 r = client.chat.completions.create(
-    model="deepseek-ai/deepseek-v4-flash",
+    model="deepseek-ai/deepseek-v4.1-flash-1017",
     messages=[{"role": "user", "content": "Hello!"}],
 )
 print(r.choices[0].message.content)
@@ -52,25 +52,22 @@ Event **redemption code** (ask in Discord "sponsor credit support" or the ai& te
 
 | Model ID | Capabilities | Context | In / Out |
 | --- | --- | --- | --- |
-| `deepseek-ai/deepseek-v4-flash` | reasoning, tools | 1M | 0.15 / 0.25 |
+| `deepseek-ai/deepseek-v4.1-flash-1017` | reasoning, tools, vision, document | 1M | 0.30 / 0.60 |
 | `zai-org/glm-5.3-flash` | reasoning, tools, vision, video, document | 1M | 0.15 / 0.50 |
 | `google/gemma-4-31b-it` | reasoning, tools, vision, video, document | 256K | 0.20 / 0.50 |
-| `deepseek-ai/deepseek-v4.1-flash` | reasoning, tools, vision, document | 1M | 0.30 / 0.60 |
 | `openai/gpt-oss-120b` | reasoning, tools | 128K | 0.15 / 0.60 |
 | `motif-technologies/motif-3` | reasoning, tools | 256K | 0.50 / 2.00 |
 | `deepseek-ai/deepseek-v4-pro` | reasoning, tools | 1M | 1.00 / 2.50 |
 | `qwen/qwen3.8-27b` | reasoning, tools, vision, video, document | 256K | 0.40 / 3.00 |
 | `qwen/qwen3.6-27b` | reasoning, tools, vision, video, document | 256K | 0.32 / 3.20 |
-| `moonshotai/kimi-k2.7-code` | reasoning, tools, vision, document | 256K | 0.75 / 3.50 |
 | `zai-org/glm-5.3` | reasoning, tools | 1M | 1.00 / 4.00 |
-| `zai-org/glm-5.2` | reasoning, tools | 1M | 1.00 / 4.00 |
 | `moonshotai/kimi-k3` | reasoning, tools, vision, document | 1M | 3.00 / 12.50 |
 
 The list is dynamic; re-check with `curl https://api.aiand.com/v1/models`.
 
 **Default picks:**
-- Text / agents / extraction: `deepseek-v4-flash` (cheapest, 1M context, tools + reasoning; reasoning can be set to `none` for speed).
-- Vision / PDFs / video: `glm-5.3-flash` or `qwen3.8-27b`.
+- Text / agents / extraction: `deepseek-v4.1-flash-1017` (1M context, tools + reasoning; reasoning can be set to `none` for speed). `deepseek-v4-flash` is retired.
+- Vision / PDFs: the same `deepseek-v4.1-flash-1017` (it accepts images). We do not call GLM.
 - Hardest reasoning step only: `kimi-k3` or `deepseek-v4-pro`.
 - `model: "auto"` lets ai& pick per request.
 

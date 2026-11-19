@@ -77,7 +77,7 @@ The natural architecture is **System 1 / System 2 / Memory**:
 | Layer | Tool | Role |
 | --- | --- | --- |
 | Perception, fast judgments | **Jev** | Per frame / per event: Noul, Choice, Score, Box in ~150 ms |
-| Reasoning, language | **ai&** (e.g. `deepseek-v4-flash`, `kimi-k3`) | Only when Jev's confidence is low or a summary/explanation/report is needed |
+| Reasoning, language | **ai&** (e.g. `deepseek-v4.1-flash-1017`, `kimi-k3`) | Only when Jev's confidence is low or a summary/explanation/report is needed |
 | Memory | **Neo4j** | Store observed events, entities and relationships over time; query patterns across them |
 
 Pitch line: "Jev is the reflex, ai& is the thinking, Neo4j is the memory." Each sponsor is load-bearing, and Jev provides the real-time "wow".
